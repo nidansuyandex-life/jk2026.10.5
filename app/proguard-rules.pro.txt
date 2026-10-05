@@ -1,0 +1,4 @@
+-keep class com.iflytek.** { *; }
+-keep class com.iflytek.sparkchain.** { *; }
+-keep class com.iflytek.cloud.** { *; }
+-dontwarn com.iflytek.**
