@@ -430,13 +430,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .home-head .right .weather{font-size:13px;color:#5A6175;margin-top:9px}
 .home-head .right .temp{font-size:12.5px;color:#8A90A2;margin-top:3px}
 .home-tl-wrap{background:#fff;border-radius:18px;margin:0 16px 12px;box-shadow:0 3px 14px rgba(30,40,80,.055);overflow:hidden}
-.home-tl-item{display:flex;align-items:center;gap:12px;padding:12px 16px;position:relative}
+.home-tl-item{display:flex;align-items:center;gap:12px;padding:12px 16px;position:relative;transition:background .15s}
 .home-tl-item[data-home-action]{cursor:pointer}
 .home-tl-item[data-home-action]:active{background:#F5FBFA}
 .home-tl-item:not(:last-child)::after{content:'';position:absolute;left:29px;bottom:-6px;width:1.5px;height:14px;background:#E6E9F1}
+/* 时间线里的勾选圆圈，与 .check 共用样式，去掉上边距让它垂直居中 */
+.home-tl-item .check{margin-top:0}
+/* 已完成状态：文字变淡+删除线 */
+.home-tl-item.is-done .home-tl-text{color:#8A90A2}
+.home-tl-item.is-done .home-tl-text .tm{color:#B0B6C6}
+.home-tl-item.is-done .home-tl-text .sub{color:#B0B6C6}
 .home-tl-dot{width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #DDE2EC;flex:none;position:relative;z-index:1;box-sizing:content-box}
 .home-tl-item[data-home-action] .home-tl-dot{border-color:var(--accent)}
-.home-tl-item.is-done .home-tl-dot{background:var(--accent);border-color:var(--accent)}
 .home-tl-text{flex:1;font-size:13.5px;color:#1B1F2A;line-height:1.5;min-width:0}
 .home-tl-text .tm{color:#8A90A2;font-size:11.5px;font-weight:600;margin-right:8px;font-variant-numeric:tabular-nums}
 .home-tl-text .sub{color:#8A90A2;font-size:11.5px;display:block;margin-top:2px;line-height:1.45}
@@ -452,7 +457,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 <div class="phone">
   <div class="pages">
 
-    <!-- ========== 首页 ========== -->
     <section class="page active" data-accent="home" id="p-home">
       <div class="scroll">
         <div class="home-head">
@@ -467,7 +471,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
           </div>
         </div>
 
-        <div class="home-section-label" style="margin-top:4px">时间线</div>
+        <div class="home-section-label" style="margin-top:4px">时间线 · 点击左侧圆圈打卡</div>
         <div class="home-tl-wrap" id="homeTlWrap"></div>
 
         <div class="home-section-label">今日皮肤状态</div>
@@ -3976,11 +3980,13 @@ function renderHomeDate(){
   }
 }
 
+/* ===== 首页时间线（打卡模式） ===== */
 function renderHomeTimeline(){
   const wrap = document.getElementById('homeTlWrap');
   if (!wrap) return;
 
   const t = todayStr();
+  const checks = getChecks();
   const manualTodos = ((state.calendarData[t] || []).filter(x => x.manual)).slice();
   manualTodos.sort((a,b) => (a.time||'').localeCompare(b.time||''));
 
@@ -4000,39 +4006,46 @@ function renderHomeTimeline(){
   let isTrainingDay = false;
   try { isTrainingDay = currentPlan().isTraining; } catch(e){ isTrainingDay = false; }
 
+  // 每个条目带一个唯一 checkKey，用于保存勾选状态
   const items = [
-    { time:'07:00', text:'起床 - 晨间 90/90 呼吸', done:true },
-    { time:'07:40', text:'护肤', sub:'早间护肤', action:'skin-morning', badge:'早间' },
-    { time:'07:40', text:'早饭（记得吃补剂）', sub:'鸡蛋 + 牛奶/豆浆 + 燕麦/面包 + 水果', action:'supplement' },
-    { time:'10:00', text:'学习', sub:'完成今日学习任务' }
+    { time:'07:00', text:'起床 - 晨间 90/90 呼吸', checkKey: `home_${t}_wake` },
+    { time:'07:40', text:'护肤', sub:'早间护肤', action:'skin-morning', badge:'早间', checkKey: `home_${t}_skin_am` },
+    { time:'07:40', text:'早饭（记得吃补剂）', sub:'鸡蛋 + 牛奶/豆浆 + 燕麦/面包 + 水果', action:'supplement', checkKey: `home_${t}_breakfast` },
+    { time:'10:00', text:'学习', sub:'完成今日学习任务', checkKey: `home_${t}_study` }
   ];
-  if (manualTodos[0]) items.push({ time: manualTodos[0].time || '', text: manualTodos[0].title, action:'todo', isTodo:true });
-  items.push({ time:'11:30', text:'中饭（记得吃补剂）', sub:'米饭/面 + 肉/鱼/豆腐 + 两份蔬菜', action:'supplement' });
-  if (manualTodos[1]) items.push({ time: manualTodos[1].time || '', text: manualTodos[1].title, action:'todo', isTodo:true });
-  items.push({ time:'17:00', text:'晚饭（记得吃补剂）', sub:'米饭 + 鱼/鸡肉 + 蔬菜（避免油腻）', action:'supplement' });
-  if (manualTodos[2]) items.push({ time: manualTodos[2].time || '', text: manualTodos[2].title, action:'todo', isTodo:true });
-  items.push({ time:'19:30', text: sportText, action:'sport', badge:'今日运动' });
+  if (manualTodos[0]) items.push({ time: manualTodos[0].time || '', text: manualTodos[0].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo1` });
+  items.push({ time:'11:30', text:'中饭（记得吃补剂）', sub:'米饭/面 + 肉/鱼/豆腐 + 两份蔬菜', action:'supplement', checkKey: `home_${t}_lunch` });
+  if (manualTodos[1]) items.push({ time: manualTodos[1].time || '', text: manualTodos[1].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo2` });
+  items.push({ time:'17:00', text:'晚饭（记得吃补剂）', sub:'米饭 + 鱼/鸡肉 + 蔬菜（避免油腻）', action:'supplement', checkKey: `home_${t}_dinner` });
+  if (manualTodos[2]) items.push({ time: manualTodos[2].time || '', text: manualTodos[2].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo3` });
+  items.push({ time:'19:30', text: sportText, action:'sport', badge:'今日运动', checkKey: `home_${t}_sport` });
   if (isTrainingDay) {
-    items.push({ time:'21:00', text:'蛋白质（运动的时候就补）', sub:'若饿或蛋白不足，补充 20–30g 蛋白质', action:'sport' });
+    items.push({ time:'21:00', text:'蛋白质（运动的时候就补）', sub:'若饿或蛋白不足，补充 20–30g 蛋白质', action:'sport', checkKey: `home_${t}_protein` });
   }
-  items.push({ time:'22:00', text:'洗漱（护肤）', sub:'晚间护理', action:'skin-night', badge:'晚间' });
-  items.push({ time:'22:30', text:'睡前 90/90 呼吸' });
+  items.push({ time:'22:00', text:'洗漱（护肤）', sub:'晚间护理', action:'skin-night', badge:'晚间', checkKey: `home_${t}_skin_pm` });
+  items.push({ time:'22:30', text:'睡前 90/90 呼吸', checkKey: `home_${t}_breathe` });
 
   wrap.innerHTML = items.map(it => {
+    const done = !!(it.checkKey && checks[it.checkKey]);
     const cls = ['home-tl-item'];
-    if (it.done) cls.push('is-done');
+    if (done) cls.push('is-done');
     const actionAttr = it.action ? `data-home-action="${it.action}"` : '';
     const badge = it.badge
       ? `<span class="home-tl-badge">${it.badge}</span>`
       : (it.isTodo ? `<span class="home-tl-badge todo">代办</span>` : '');
     const arrow = it.action ? `<span class="home-tl-arrow">›</span>` : '';
     const sub = it.sub ? `<span class="sub">${it.sub}</span>` : '';
+    // 打卡圆圈：使用 .check 类，配合 data-check-key，点击即可勾选/取消
+    const checkHtml = `<span class="check ${done ? 'done' : ''}" data-check-key="${it.checkKey}"></span>`;
     return `<div class="${cls.join(' ')}" ${actionAttr}>
-      <span class="home-tl-dot"></span>
+      ${checkHtml}
       <span class="home-tl-text">${it.time ? `<span class="tm">${it.time}</span>` : ''}${it.text}${sub}</span>
       ${badge}${arrow}
     </div>`;
   }).join('');
+
+  // 保证所有圆圈状态是最新的
+  applyChecks();
 }
 
 function switchTab(target){
@@ -4089,7 +4102,9 @@ function jumpFromHome(action){
   if (action === 'sport'){ switchTab('p-sport'); return; }
 }
 
+/* 首页时间线点击：如果点击的是勾选圆圈，跳过跳转逻辑，交给 .check 处理器 */
 document.addEventListener('click', e => {
+  if (e.target.closest('.check')) return;   // 勾选圆圈：走冒泡阶段的 check 处理
   const tl = e.target.closest('[data-home-action]');
   if (!tl) return;
   e.preventDefault();
@@ -4360,14 +4375,21 @@ document.addEventListener('click', e => {
     if (mode === 'original') setOverride(today, null); else setOverride(today, mode);
     buildCalendarFromPlans(); renderSportAll(); renderCalendar(); renderAllTodo(); renderUndone(); renderHomeTimeline(); return;
   }
+
+  /* 勾选圆圈：切换 done 状态并保存 */
   const c = e.target.closest('.check');
   if (c && !c.closest('[data-toggle-todo]')) {
     c.classList.toggle('done');
-    if (c.dataset.checkKey) setCheck(c.dataset.checkKey, c.classList.contains('done'));
+    const isDone = c.classList.contains('done');
+    if (c.dataset.checkKey) setCheck(c.dataset.checkKey, isDone);
     const supp = c.closest('.supp');
-    if (supp) supp.classList.toggle('taken', c.classList.contains('done'));
+    if (supp) supp.classList.toggle('taken', isDone);
+    // 首页时间线：同步更新 is-done，用于文字变灰/删除线
+    const homeItem = c.closest('.home-tl-item');
+    if (homeItem) homeItem.classList.toggle('is-done', isDone);
     return;
   }
+
   const cntBtn = e.target.closest('.cnt-btn');
   if (cntBtn && !cntBtn.disabled) {
     const code = cntBtn.dataset.code;
@@ -5302,7 +5324,6 @@ init();
   }
   window.__collectBackup = collectBackup;
 
-  /* ===== 原生回调：读取备份文件后调用 ===== */
   window.onBackupFileContent = function(json){
     try {
       const pack = JSON.parse(json);
@@ -5412,7 +5433,6 @@ init();
     else alert(`已在下方生成备份文本（共 ${count} 项数据），请长按复制。`);
   }
 
-  /* 兼容旧浏览器 input[type=file] 方式 */
   function importBackup(file){
     const reader = new FileReader();
     reader.onload = function(ev){
@@ -5557,7 +5577,6 @@ init();
       if (e.target.closest('#exportSkinCsvBtn')) { e.preventDefault(); exportSkinCsv(); return; }
       if (e.target.closest('#exportTxCsvBtn')) { e.preventDefault(); exportTxCsv(); return; }
 
-      /* 关键：导入备份 —— 优先调用 Android 原生文件选择器 */
       if (e.target.closest('#importDataBtn')) {
         e.preventDefault();
         if (window.AndroidBridge && typeof AndroidBridge.pickBackupFile === 'function') {
@@ -5644,7 +5663,7 @@ init();
     if (e.target.closest('[data-open-settings]')) setTimeout(injectAppSettings, 150);
   }, true);
 
-  console.log('[Enhanced v4.7] 完整版已加载 · 学习时间线 + 和风天气 + 讯飞语音 + 原生导入导出');
+  console.log('[Enhanced v4.8] 完整版已加载 · 首页时间线打卡模式');
 })();
 </script>
 </body>
