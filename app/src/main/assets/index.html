@@ -1197,7 +1197,7 @@ function setOverride(date, mode){
 }
 function getOverride(date){ return getOverrides()[fmtDate(date)] || null; }
 
-/* ===== 待办状态 ===== */
+/* ===== 待办 ===== */
 function getTodoStatusMap(){ try { return JSON.parse(__nativeGetItem('todoStatus') || '{}'); } catch(e){ return {}; } }
 function saveTodoStatusMap(m){ __nativeSetItem('todoStatus', JSON.stringify(m)); }
 function getTodoKey(date, item){ return `${date}|${item.time || ''}|${item.title || ''}`; }
@@ -1260,7 +1260,7 @@ function learnNoteCategory(note, category){
   Store.save('noteCategoryMap', map);
 }
 
-/* ===== 护肤自定义步骤 ===== */
+/* ===== 护肤 ===== */
 function getCustomSkinSteps(){
   const d = Store.load('customSkinSteps', null);
   if (!d || typeof d !== 'object') return { morning: [], night: [] };
@@ -1625,7 +1625,7 @@ function buildCalendarFromPlans(){
   state.calendarData = data;
 }
 
-/* ===== 记账分类 ===== */
+/* ===== 记账 ===== */
 const EXPENSE_CATS = [
   ['餐饮', /(餐饮|早餐|午餐|晚餐|夜宵|吃|饭|餐|咖啡|奶茶|外卖|水果|零食|饮料|火锅|烧烤|食堂|小吃|买菜)/],
   ['交通', /(交通|打车|公交|地铁|加油|停车|高铁|火车|机票|车费|滴滴|出租|单车|过路费)/],
@@ -2089,8 +2089,6 @@ function renderExportPreview(){
   const totalInc = list.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
   $('#exportPreview').innerHTML = `记录数：${list.length} 条<br>支出合计：¥ ${totalExp.toFixed(2)}<br>收入合计：¥ ${totalInc.toFixed(2)}`;
 }
-
-/* ★ 修改：导出 CSV 走原生桥接 */
 function exportCSV(){
   const list = getRangeTransactions();
   if (!list.length) { alert('所选时间范围内没有记录'); return; }
@@ -3012,6 +3010,8 @@ function updateSportTimerText(){
   const sc = document.getElementById('sportSetCount');
   if (sc) sc.textContent = Object.values(sess.sets || {}).reduce((a, b) => a + b.length, 0);
 }
+
+/* ★ 修改：点击开始打卡后自动切到「正式训练」tab */
 function startSportSession(){
   const t = $('#sportStartTime').value || fmtTime(new Date());
   const parts = t.split(':');
@@ -3022,21 +3022,29 @@ function startSportSession(){
   saveSportSession({ startTs: d.getTime(), startLabel: `${pad(h)}:${pad(m)}`, endTs: null, sets: {} });
   const input = $('#sportStartTime');
   if (input) delete input.dataset.userEdited;
-  renderSportSession(); renderActual();
+  renderSportSession(); renderActual(); renderFormal();
+  // ★ 自动切换到「正式训练」tab
+  const page = document.getElementById('p-sport');
+  const nav = page && page.querySelector('.subnav');
+  if (nav) {
+    const items = [...nav.querySelectorAll('.sub-item')];
+    const btn = items.find(b => b.textContent === '正式训练');
+    if (btn) btn.click();
+  }
 }
 function endSportSession(){
   const sess = getSportSession();
   if (!sess) return;
   sess.endTs = Date.now();
   saveSportSession(sess);
-  renderSportSession(); renderActual();
+  renderSportSession(); renderActual(); renderFormal();
 }
 function resetSportSession(){
   if (!confirm('确定要重置今天的打卡记录吗？')) return;
   saveSportSession(null);
   const input = $('#sportStartTime');
   if (input) { input.value = fmtTime(new Date()); delete input.dataset.userEdited; }
-  renderSportSession(); renderActual();
+  renderSportSession(); renderActual(); renderFormal();
 }
 function recordSetTime(code){
   const sess = getSportSession();
@@ -3241,16 +3249,48 @@ function updateExCard(ex){
   if (finished && !tag) { tag = document.createElement('span'); tag.className = 'tag on ex-done-tag'; tag.textContent = '已完成'; el.querySelector('.ex-top').appendChild(tag); }
   else if (!finished && tag) tag.remove();
 }
+
+/* ★ 修改：正式训练页 —— 未开始打卡时只显示提示 */
 function renderFormal(){
   Object.values(state.restTimers).forEach(t => clearInterval(t));
   state.restTimers = {};
   const p = currentPlan();
   const el = $('#formalContent');
   if (!el) return;
+
+  const sess = getSportSession();
+
+  /* ★ 训练日但未开始打卡：提示用户先去「今日计划」页点开始打卡 */
+  if (p.isTraining && !sess) {
+    el.innerHTML = `
+      <div class="card" style="background:linear-gradient(135deg,#FFF6F2,#FFEDE6);border:1.5px solid #FFD9CC;text-align:center;padding:32px 20px">
+        <div style="font-size:48px;margin-bottom:14px">⏱️</div>
+        <div style="font-size:17px;font-weight:700;color:#E4573D;margin-bottom:10px">请先开始打卡</div>
+        <p class="tip" style="text-align:left;color:#8A5A48;margin-bottom:18px">正式训练内容只在「开始打卡」后才会显示。<br><br>请先回到「今日计划」页，设置开始时间后点击「▶ 开始打卡」，再回到本页查看今天的具体训练动作。</p>
+        <button class="btn-primary" id="gotoStartSportBtn" style="background:linear-gradient(135deg,#FF6B5B,#FFA36B)">← 去今日计划页开始打卡</button>
+      </div>
+    `;
+    const gotoBtn = document.getElementById('gotoStartSportBtn');
+    if (gotoBtn) {
+      gotoBtn.onclick = () => {
+        const page = document.getElementById('p-sport');
+        const nav = page && page.querySelector('.subnav');
+        if (nav) {
+          const items = [...nav.querySelectorAll('.sub-item')];
+          const btn = items.find(b => b.textContent === '今日计划');
+          if (btn) btn.click();
+        }
+      };
+    }
+    return;
+  }
+
   if (!p.isTraining) {
     el.innerHTML = `<div class="card" style="background:var(--accent-soft);text-align:center;padding:28px 20px"><div style="font-size:40px;margin-bottom:12px">${p.icon}</div><div style="font-size:16px;font-weight:700;margin-bottom:10px">${p.label}</div><p class="tip" style="text-align:left">${p.tips.join('<br>')}</p></div>`;
     return;
   }
+
+  /* 已开始打卡 / 已完成打卡：正常显示训练内容 */
   const warmExHTML = (w, type) => {
     const checkKey = `${type}_${todayStr()}_${w.name}`;
     const doseText = w.dose || w.reps || '';
@@ -3271,6 +3311,8 @@ function renderFormal(){
     </div>`;
   };
   let html = '';
+  const sessInfo = sess ? (sess.endTs ? '（已完成）' : '（进行中）') : '';
+  html += `<div class="card" style="background:var(--accent-soft)"><div class="card-title">📋 训练内容 ${sessInfo} <span class="muted">${p.icon} ${p.label}</span></div><p class="tip">${p.summary}</p></div>`;
   if (p.warmup.length) html += `<div class="card"><div class="card-title">🔥 热身 <span class="muted">${p.warmup.length} 个动作 · 8–10 分钟</span></div>${p.warmup.map(w => warmExHTML(w, 'warm')).join('')}</div>`;
   html += `<div class="card"><div class="card-title">🏋️ 主训练 <span class="muted">${p.exercises.length} 个动作</span></div>${p.exercises.map(exCardHTML).join('')}</div>`;
   if (p.stretch.length) html += `<div class="card"><div class="card-title">🧘 训练后拉伸 <span class="muted">${p.stretch.length} 个动作 · 约 5 分钟</span></div>${p.stretch.map(s => warmExHTML(s, 'stretch')).join('')}</div>`;
@@ -3474,7 +3516,6 @@ function renderHomeDate(){
   }
 }
 
-/* ★ 首页时间线打卡模式 */
 function renderHomeTimeline(){
   const wrap = document.getElementById('homeTlWrap');
   if (!wrap) return;
@@ -3600,6 +3641,8 @@ $$('.subnav').forEach(nav => {
     if (btn.textContent === '总代办') renderAllTodo();
     if (btn.textContent === '今日计划') renderSportSession();
     if (btn.textContent === '身体状态') { renderSportBodyStats(); renderHistorySummary(); renderActual(); }
+    /* ★ 新增：切到「正式训练」时重新渲染（根据打卡状态） */
+    if (btn.textContent === '正式训练') renderFormal();
     if (btn.textContent === '护肤') renderSkin();
   });
 });
@@ -4556,7 +4599,7 @@ init();
   setTimeout(checkAutoGenerate, 3000);
 })();
 
-/* ========== 增强补丁：设置 / 备份 / 导入原生桥接 ========== */
+/* ========== 增强补丁 ========== */
 (function(){
   if (window.__enhancedV3) return; window.__enhancedV3 = true;
   function getSetting(key, def){ try { const v = window.__appStorageGet('app_setting_'+key); return v===null?def:JSON.parse(v); } catch(e){ return def; } }
@@ -4706,7 +4749,6 @@ init();
   }
   window.sendAppNotification = sendNotification;
 
-  /* ★ 久坐提醒：8:00 ~ 17:00 之间触发 */
   function initSitReminder(){
     try { window.__lastSitReminder = parseInt(window.__appStorageGet('last_sit_reminder') || '0'); } catch(e){ window.__lastSitReminder = 0; }
     if (!window.__lastSitReminder) {
@@ -4831,7 +4873,7 @@ init();
   }, 5 * 60 * 1000);
   setTimeout(function(){ injectAppSettings(); initSitReminder(); checkCrashLog(); checkBackupReminder(); }, 800);
   document.addEventListener('click', function(e){ if (e.target.closest('[data-open-settings]')) setTimeout(injectAppSettings, 150); }, true);
-  console.log('[Enhanced v4.9] 完整版已加载 · 时间线打卡 + 8:00-17:00 久坐提醒 + 原生 CSV 导出 + SparkChain AI');
+  console.log('[Enhanced v5.0] 正式训练需先打卡 · 8:00-17:00 久坐提醒');
 })();
 </script>
 </body>
