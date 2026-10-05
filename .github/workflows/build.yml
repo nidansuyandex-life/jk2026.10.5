@@ -20,10 +20,24 @@ jobs:
         with:
           gradle-version: '8.4'
 
+      # ⭐ 关键：先生成一个 debug keystore，再构建
+      - name: Generate debug keystore
+        run: |
+          mkdir -p $HOME/.android
+          keytool -genkeypair -v \
+            -keystore $HOME/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Build Debug APK
         run: gradle assembleDebug --stacktrace
 
-      - name: Build Release APK (signed with debug key)
+      - name: Build Release APK
         run: gradle assembleRelease --stacktrace
 
       - name: Upload Debug APK
@@ -32,7 +46,7 @@ jobs:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload Release APK (signed)
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-signed
