@@ -29,15 +29,6 @@ import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
 
-import com.iflytek.sparkchain.core.LLM;
-import com.iflytek.sparkchain.core.LLMCallbacks;
-import com.iflytek.sparkchain.core.LLMConfig;
-import com.iflytek.sparkchain.core.LLMError;
-import com.iflytek.sparkchain.core.LLMEvent;
-import com.iflytek.sparkchain.core.LLMOutput;
-import com.iflytek.sparkchain.core.SparkChain;
-import com.iflytek.sparkchain.core.SparkChainConfig;
-
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -62,9 +53,6 @@ public class MainActivity extends Activity {
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private ValueCallback<Uri[]> filePathCallback;
-
-    private LLM llm;
-    private boolean llmReady = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -150,61 +138,6 @@ public class MainActivity extends Activity {
         });
 
         requestPermsIfNeeded();
-        initSparkChain();
-    }
-
-    private void initSparkChain() {
-        try {
-            SparkChainConfig config = SparkChainConfig.builder()
-                    .appId("4c627b59")
-                    .apiKey("2fbffaacd145309be7c024db99e9c7ef")
-                    .apiSecret("YzI1MDJmYWM0NTliNzNkMjI3NGIyM2Uz");
-            int ret = SparkChain.getInst().init(getApplicationContext(), config);
-            Log.d(TAG, "SparkChain init ret=" + ret);
-
-            LLMConfig llmConfig = LLMConfig.builder()
-                    .domain("4.0Ultra")
-                    .url("wss://spark-api.xf-yun.com/v4.0/chat");
-            llm = new LLM(llmConfig);
-            llmReady = true;
-
-            llm.setLLMCallbacks(new LLMCallbacks() {
-                @Override
-                public void onLLMResult(LLMOutput output, Object usrTag) {
-                    final String content = output.getContent();
-                    final int status = output.getStatus();
-                    final String tag = (usrTag == null) ? "chat" : usrTag.toString();
-                    runOnUiThread(() -> {
-                        try {
-                            String q = JSONObject.quote(content == null ? "" : content);
-                            String tq = JSONObject.quote(tag);
-                            if (status == 2) {
-                                webView.evaluateJavascript("window.onNativeChatState && window.onNativeChatState('finished', " + tq + ")", null);
-                            } else {
-                                webView.evaluateJavascript("window.onNativeChatResult && window.onNativeChatResult(" + q + ", " + tq + ")", null);
-                            }
-                        } catch (Exception e) { Log.e(TAG, "onLLMResult eval fail", e); }
-                    });
-                }
-                @Override
-                public void onLLMError(LLMError error, Object usrTag) {
-                    final String msg = (error == null) ? "未知错误" : error.getErrMsg();
-                    final String tag = (usrTag == null) ? "chat" : usrTag.toString();
-                    runOnUiThread(() -> {
-                        try {
-                            String m = JSONObject.quote(msg);
-                            String tq = JSONObject.quote(tag);
-                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", " + tq + ")", null);
-                        } catch (Exception e) { Log.e(TAG, "onLLMError eval fail", e); }
-                    });
-                }
-                @Override
-                public void onLLMEvent(LLMEvent event, Object usrTag) { }
-            });
-        } catch (Throwable t) {
-            Log.e(TAG, "initSparkChain fail", t);
-            llmReady = false;
-        }
     }
 
     private void requestPermsIfNeeded() {
@@ -343,7 +276,6 @@ public class MainActivity extends Activity {
             }
         }
 
-        /* ★ CSV 导出：保存到外部目录 + 分享面板 */
         @JavascriptInterface
         public void saveCsv(final String csvContent, final String filename) {
             try {
@@ -395,52 +327,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setBackupReminder(boolean on) { }
 
+        /* ★ SparkChain 暂时未接入 —— 回给 JS 一个友好的错误提示 */
         @JavascriptInterface
         public void sendChat(final String text) {
-            if (!llmReady || llm == null) {
-                webView.post(() -> webView.evaluateJavascript(
-                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化')", null));
-                return;
-            }
-            new Thread(() -> {
-                try {
-                    llm.clearHistory();
-                    llm.chat(text, "chat");
-                } catch (Exception e) {
-                    Log.e(TAG, "sendChat fail", e);
-                    final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
-                    webView.post(() -> {
-                        try {
-                            String m = JSONObject.quote(msg);
-                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ")", null);
-                        } catch (Exception ignored) {}
-                    });
-                }
-            }).start();
+            webView.post(() -> webView.evaluateJavascript(
+                    "window.onNativeChatError && window.onNativeChatError('AI 聊天暂未接入，请稍后升级 App')", null));
         }
 
         @JavascriptInterface
         public void sendStyling(final String prompt) {
-            if (!llmReady || llm == null) {
-                webView.post(() -> webView.evaluateJavascript(
-                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化', 'styling')", null));
-                return;
-            }
-            new Thread(() -> {
-                try {
-                    llm.clearHistory();
-                    llm.chat(prompt, "styling");
-                } catch (Exception e) {
-                    Log.e(TAG, "sendStyling fail", e);
-                    final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
-                    webView.post(() -> {
-                        try {
-                            String m = JSONObject.quote(msg);
-                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", 'styling')", null);
-                        } catch (Exception ignored) {}
-                    });
-                }
-            }).start();
+            webView.post(() -> webView.evaluateJavascript(
+                    "window.onNativeChatError && window.onNativeChatError('AI 搭配暂未接入，请稍后升级 App', 'styling')", null));
         }
     }
 
