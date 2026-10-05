@@ -14,15 +14,6 @@ android {
         versionName "1.0"
     }
 
-    /* ========== 关键：让 debug 和 release 都用 debug 签名 ==========
-       GitHub Actions 里 workflow 会先执行：
-         mkdir -p $HOME/.android
-         keytool -genkeypair -keystore $HOME/.android/debug.keystore \
-                 -storepass android -alias androiddebugkey \
-                 -keypass android -keyalg RSA -keysize 2048 \
-                 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-       从而保证 keystore 文件存在，避免 "Keystore file not found" 报错。
-    */
     signingConfigs {
         debug {
             storeFile file("${System.properties['user.home']}/.android/debug.keystore")
@@ -38,7 +29,7 @@ android {
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug   // 用 debug 签名，避免“安装包没有签名文件”
+            signingConfig signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -49,10 +40,7 @@ android {
     }
 
     packagingOptions {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-        // 讯飞 SparkChain 可能出现重复 META-INF，加上这几行避免冲突
+        jniLibs { useLegacyPackaging = true }
         resources {
             excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt',
                          'META-INF/NOTICE', 'META-INF/NOTICE.txt', 'META-INF/*.kotlin_module']
@@ -60,30 +48,15 @@ android {
     }
 
     sourceSets {
-        main {
-            // 让 libs 目录下的 .so 也能被打包
-            jniLibs.srcDirs = ['libs']
-        }
-    }
-
-    buildFeatures {
-        // 不需要 ViewBinding / DataBinding，保持简洁
+        main { jniLibs.srcDirs = ['libs'] }
     }
 }
 
 dependencies {
-    // 打包 libs 目录下的所有 .jar / .aar（包括 Codec.aar、SparkChain.aar）
     implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
-
-    // AndroidX 基础库
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.core:core:1.12.0'
-
-    // WebViewAssetLoader：用于以 https://appassets.androidplatform.net/ 加载页面，
-    // 从而让 getUserMedia（麦克风）在 WebView 中被允许
     implementation 'androidx.webkit:webkit:1.8.0'
-
-    // 讯飞 SparkChain 可能需要（若 .aar 中已包含，可保留不影响）
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
 }
