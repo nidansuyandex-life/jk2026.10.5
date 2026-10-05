@@ -77,7 +77,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .btn-primary{width:100%;border:none;font-family:inherit;font-size:15px;font-weight:600;color:#fff;padding:15px;border-radius:16px;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));margin-top:4px}
 .btn-ghost{width:100%;border:none;font-family:inherit;font-size:14px;font-weight:600;padding:13px;border-radius:14px;cursor:pointer;background:var(--accent-soft);color:var(--accent)}
 .btn-save-settings{width:100%;border:1.5px solid #8B7CF6;font-family:inherit;font-size:15px;font-weight:700;color:#1B1F2A;padding:15px;border-radius:16px;cursor:pointer;background:#fff}
-/* 保存待办按钮字体黑色 */
 #saveTodoBtn{color:#1B1F2A !important;font-weight:700}
 .week-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #F3F5F9;font-size:13px}
 .week-row:last-child{border-bottom:none;padding-bottom:0}
@@ -127,9 +126,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .scale i{flex:1;height:26px;border-radius:7px;background:#F0F2F7;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-style:normal;color:#9AA0B2;cursor:pointer}
 .scale i.on{background:var(--accent);color:#fff;font-weight:700}
 .scale i.warn{background:#FFE3C2;color:#C97A15;font-weight:700}
-.upload{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:140px;border:2px dashed #D9DEEA;border-radius:18px;padding:20px;text-align:center;color:#9AA0B2;font-size:12.5px;background:#fff;margin-bottom:12px;cursor:pointer}
+.upload{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:140px;border:2px dashed #D9DEEA;border-radius:18px;padding:20px;text-align:center;color:#9AA0B2;font-size:12.5px;background:#fff;margin-bottom:12px;cursor:pointer;position:relative}
 .upload .plus{display:block;font-size:28px;color:#C3C9D8;margin-bottom:6px}
-.upload input[type=file]{display:none}
+.upload input[type=file]{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .upload img{max-width:100%;max-height:200px;border-radius:12px;margin-top:8px;display:block}
 .edit-tools{display:none;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .edit-tools.show{display:flex}
@@ -357,7 +356,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .plan-start-card{background:linear-gradient(135deg,#FFF6F2,#FFEDE6);border:1.5px solid #FFD9CC}
 .plan-start-card .card-title{color:#E4573D}
 .plan-start-card .lb{color:#8A5A48}
-/* ===== AI 聊天 ===== */
 .chat-panel{position:absolute;inset:0;z-index:150;background:#F5F6FA;display:none;flex-direction:column}
 .chat-panel.show{display:flex}
 .chat-head{flex:none;padding:calc(14px + env(safe-area-inset-top, 14px)) 16px 14px;background:linear-gradient(135deg,#8B7CF6,#B39BFF);color:#fff;display:flex;align-items:center;gap:12px}
@@ -387,7 +385,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .chat-empty{text-align:center;padding:40px 20px;color:#8A90A2}
 .chat-empty .big{font-size:42px;margin-bottom:12px}
 .chat-empty p{font-size:13px;line-height:1.7}
-/* ===== 周报/月报 ===== */
 .report-panel{position:absolute;inset:0;z-index:170;background:#F5F6FA;display:none;flex-direction:column}
 .report-panel.show{display:flex}
 .report-head{flex:none;padding:calc(14px + env(safe-area-inset-top, 14px)) 16px 14px;background:linear-gradient(135deg,#1FBFA9,#5FD9C4);color:#fff;display:flex;align-items:center;gap:12px}
@@ -425,7 +422,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .report-history-item .rhi-t{font-size:13.5px;font-weight:600;color:#1B1F2A}
 .report-history-item .rhi-s{font-size:11.5px;color:#8A90A2;margin-top:3px}
 .report-empty{text-align:center;padding:40px 20px;color:#8A90A2;font-size:13px;line-height:1.7}
-/* ===== 首页 ===== */
 .home-head{background:#fff;padding:calc(22px + env(safe-area-inset-top, 22px)) 20px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .home-head .left .title{font-size:26px;font-weight:800;letter-spacing:1px;color:#1B1F2A}
 .home-head .left .suggest{font-size:12px;color:#8A90A2;margin-top:10px;line-height:1.65;max-width:230px}
@@ -474,14 +470,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
         <div class="home-section-label" style="margin-top:4px">时间线</div>
         <div class="home-tl-wrap" id="homeTlWrap"></div>
 
-        <!-- 今日皮肤状态 -->
         <div class="home-section-label">今日皮肤状态</div>
         <div class="card" style="margin-top:0">
           <div class="card-title">今日皮肤状态 <span class="muted">点击切换护肤流程</span></div>
           <div class="opt-list" id="skinOptions"></div>
         </div>
 
-        <!-- 今日身体状态 -->
         <div class="home-section-label">今日身体状态</div>
         <div class="card" style="margin-top:0">
           <div class="card-title">今日身体状态 <span class="muted">点击切换，同步调整计划</span></div>
@@ -951,7 +945,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
     <div class="box"><div class="big" id="centerTimerNum">200</div><div class="txt">该站起来走动走动了</div><div class="sub">起身 → 走动2–3分钟 → 下巴轻收5次 → 肩胛向后下轻收5–8次</div></div>
   </div>
 
-  <!-- AI 聊天面板 -->
   <div class="chat-panel" id="chatPanel">
     <div class="chat-head">
       <span style="font-size:22px">✨</span>
@@ -978,7 +971,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
     </div>
   </div>
 
-  <!-- 周报/月报面板 -->
   <div class="report-panel" id="reportPanel">
     <div class="report-head">
       <span style="font-size:22px">📊</span>
@@ -1041,7 +1033,6 @@ const __nativeGetItem = window.__appStorageGet;
 const __nativeSetItem = window.__appStorageSet;
 const __nativeRemoveItem = window.__appStorageRemove;
 
-/* ===== 统一持久化 ===== */
 const Store = {
   save(key, val){
     try { __nativeSetItem('app_' + key, JSON.stringify(val)); }
@@ -1390,7 +1381,6 @@ const EXERCISES = {
   '肩胛放松': { name:'肩胛放松', purpose:'肩部放松', start:'双手自然垂下。', how:'做几次肩膀放松。', breath:'自然呼吸。', mistake:'大幅度颈部拉伸。', feel:'肩部放松。', note:'不要做大幅度颈部拉伸。' }
 };
 
-/* MET 系数 */
 function getMetForExercise(code){
   const c = String(code || '');
   if (/拉伸|放松|婴儿式|猫牛|呼吸|下巴|肩胛绕环|颈深屈肌|筋膜球/.test(c)) return 1.8;
@@ -1725,7 +1715,7 @@ async function fetchWeatherAndUpdate(){
   const el1 = document.getElementById('homeWeather');
   const el2 = document.getElementById('homeTemp');
   try {
-    let location = '101010100'; // 北京默认
+    let location = '101010100';
     try {
       const pos = await new Promise((resolve, reject) => {
         if (!navigator.geolocation) return reject(new Error('no geolocation'));
@@ -1735,7 +1725,7 @@ async function fetchWeatherAndUpdate(){
         });
       });
       location = `${pos.coords.longitude.toFixed(2)},${pos.coords.latitude.toFixed(2)}`;
-    } catch(e) { /* 用默认 */ }
+    } catch(e) {}
 
     const url = `https://${QWEATHER.API_HOST}/v7/weather/now?location=${encodeURIComponent(location)}&key=${QWEATHER.API_KEY}`;
     const res = await fetch(url);
@@ -2431,7 +2421,6 @@ function todoRowHTML(it, today){
 function renderAllTodo(){
   const today = todayStr();
   const q = (state.search.todo || '').toLowerCase();
-  /* 显示全部待办（含过期未完成） */
   let items = getSortedTodoItems();
   if (q) items = items.filter(i => (i.title + ' ' + (i.desc || '')).toLowerCase().indexOf(q) >= 0);
   if (!items.length) { $('#allTodoList').innerHTML = '<p class="tip" style="color:#8A90A2">暂无待办事项</p>'; return; }
@@ -2454,7 +2443,6 @@ function renderAllTodo(){
 function renderUndone(){
   const today = todayStr();
   const q = (state.search.todo || '').toLowerCase();
-  /* 显示所有未完成（含过期未完成） */
   let items = getSortedTodoItems().filter(i => !i.done);
   if (q) items = items.filter(i => (i.title + ' ' + (i.desc || '')).toLowerCase().indexOf(q) >= 0);
   $('#undoneCount').textContent = `${items.length} 项`;
@@ -3974,7 +3962,6 @@ function renderHomeDate(){
   const el3 = document.getElementById('homeTemp');
   if (el3 && (!el3.textContent.trim() || el3.textContent.trim() === '--℃')) el3.textContent = '--℃';
 
-  // 只保留生活建议，不含衣着建议
   const s = document.getElementById('lifeSuggest');
   if (s) {
     try {
@@ -4017,7 +4004,6 @@ function renderHomeTimeline(){
     { time:'07:00', text:'起床 - 晨间 90/90 呼吸', done:true },
     { time:'07:40', text:'护肤', sub:'早间护肤', action:'skin-morning', badge:'早间' },
     { time:'07:40', text:'早饭（记得吃补剂）', sub:'鸡蛋 + 牛奶/豆浆 + 燕麦/面包 + 水果', action:'supplement' },
-    /* 学习：10:00 时间线上普通条目，不再使用打卡卡片 */
     { time:'10:00', text:'学习', sub:'完成今日学习任务' }
   ];
   if (manualTodos[0]) items.push({ time: manualTodos[0].time || '', text: manualTodos[0].title, action:'todo', isTodo:true });
@@ -5269,7 +5255,7 @@ init();
   setTimeout(checkAutoGenerate, 3000);
 })();
 
-/* ========== 增强补丁：设置 / 备份 ========== */
+/* ========== 增强补丁：设置 / 备份 / 导入原生桥接 ========== */
 (function(){
   if (window.__enhancedV3) return; window.__enhancedV3 = true;
 
@@ -5315,6 +5301,28 @@ init();
     return { version:1, app:'health-life', exportedAt:new Date().toISOString(), data };
   }
   window.__collectBackup = collectBackup;
+
+  /* ===== 原生回调：读取备份文件后调用 ===== */
+  window.onBackupFileContent = function(json){
+    try {
+      const pack = JSON.parse(json);
+      const data = pack && pack.data;
+      if (!data) { alert('备份文件内容无效'); return; }
+      const keys = Object.keys(data);
+      if (!keys.length) { alert('备份文件为空'); return; }
+      if (!confirm(`将导入 ${keys.length} 项数据，覆盖当前记录。确定继续？`)) return;
+      let ok = 0;
+      keys.forEach(k => { try { window.__appStorageSet(k, data[k]); ok++; } catch(e){} });
+      window.__appStorageSet('lastBackupAt', String(Date.now()));
+      alert(`已恢复 ${ok} 项数据。App 将重启。`);
+      setTimeout(() => { try { location.reload(); } catch(e){} }, 800);
+    } catch(e) {
+      alert('备份文件格式错误：' + e.message);
+    }
+  };
+  window.onBackupFileError = function(msg){
+    alert('读取备份失败：' + (msg || '未知错误'));
+  };
 
   function downloadCsv(rows, filename){
     const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
@@ -5377,7 +5385,7 @@ init();
     try {
       if (window.AndroidBridge && typeof AndroidBridge.saveBackup === 'function') {
         AndroidBridge.saveBackup(json);
-        alert(`已导出 ${count} 项数据。`);
+        alert(`已导出 ${count} 项数据。\n请在弹出的系统分享面板中选择保存位置。`);
         return;
       }
     } catch(e){}
@@ -5404,22 +5412,11 @@ init();
     else alert(`已在下方生成备份文本（共 ${count} 项数据），请长按复制。`);
   }
 
+  /* 兼容旧浏览器 input[type=file] 方式 */
   function importBackup(file){
     const reader = new FileReader();
     reader.onload = function(ev){
-      let pack;
-      try { pack = JSON.parse(ev.target.result); }
-      catch(e){ alert('文件格式错误'); return; }
-      const data = pack && pack.data;
-      if (!data) { alert('备份文件内容无效'); return; }
-      const keys = Object.keys(data);
-      if (!keys.length) { alert('备份文件为空'); return; }
-      if (!confirm(`将导入 ${keys.length} 项数据，覆盖当前记录。确定继续？`)) return;
-      let ok = 0;
-      keys.forEach(k => { try { window.__appStorageSet(k, data[k]); ok++; } catch(e){} });
-      window.__appStorageSet('lastBackupAt', String(Date.now()));
-      alert(`已恢复 ${ok} 项数据。请重启 App。`);
-      setTimeout(() => { try { location.reload(); } catch(e){} }, 1000);
+      window.onBackupFileContent(ev.target.result);
     };
     reader.readAsText(file);
   }
@@ -5505,8 +5502,8 @@ init();
       '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">久坐提醒：App 在前台时每 30 分钟弹一次。语音时长修改后立即生效。</p>' +
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">数据备份</div>' +
       '<button id="exportDataBtn" style="width:100%;border:none;font-family:inherit;font-size:14px;font-weight:600;color:#fff;padding:13px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#8B7CF6,#B39BFF);margin-bottom:8px">⬇️ 导出数据备份（JSON）</button>' +
-      '<label for="importDataFile" style="display:block;text-align:center;width:100%;border:1.5px solid #E3E6EF;font-family:inherit;font-size:14px;font-weight:600;color:#5A6175;padding:12px;border-radius:12px;cursor:pointer;background:#fff;box-sizing:border-box">⬆️ 导入备份文件</label>' +
-      '<input type="file" id="importDataFile" accept=".json,application/json" style="display:none">' +
+      '<button id="importDataBtn" style="display:block;width:100%;border:1.5px solid #E3E6EF;font-family:inherit;font-size:14px;font-weight:600;color:#5A6175;padding:12px;border-radius:12px;cursor:pointer;background:#fff;box-sizing:border-box">⬆️ 导入备份文件</button>' +
+      '<input type="file" id="importDataFile" accept=".json,application/json" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">' +
       '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">建议每 30 天导出一次。</p>' +
       '<textarea id="backupTextBox" readonly placeholder="点击上方按钮后，备份内容会显示在这里" style="display:none;width:100%;height:150px;margin-top:10px;border:1.5px solid #E3E6EF;border-radius:10px;padding:10px;font-size:11px;font-family:monospace;line-height:1.5;color:#3A4152;background:#fff;outline:none;box-sizing:border-box"></textarea>' +
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">健康报告</div>' +
@@ -5559,6 +5556,18 @@ init();
       if (e.target.closest('#exportSportCsvBtn')) { e.preventDefault(); exportSportCsv(); return; }
       if (e.target.closest('#exportSkinCsvBtn')) { e.preventDefault(); exportSkinCsv(); return; }
       if (e.target.closest('#exportTxCsvBtn')) { e.preventDefault(); exportTxCsv(); return; }
+
+      /* 关键：导入备份 —— 优先调用 Android 原生文件选择器 */
+      if (e.target.closest('#importDataBtn')) {
+        e.preventDefault();
+        if (window.AndroidBridge && typeof AndroidBridge.pickBackupFile === 'function') {
+          try { AndroidBridge.pickBackupFile(); return; } catch(err){ console.warn('pickBackupFile failed', err); }
+        }
+        const inp = document.getElementById('importDataFile');
+        if (inp) inp.click();
+        return;
+      }
+
       if (e.target.closest('#genWeekReportBtn')) {
         e.preventDefault();
         if (window.__generateReport) window.__generateReport('week');
@@ -5635,7 +5644,7 @@ init();
     if (e.target.closest('[data-open-settings]')) setTimeout(injectAppSettings, 150);
   }, true);
 
-  console.log('[Enhanced v4.6] 完整版已加载 · 学习时间线 + 和风天气 + 讯飞语音');
+  console.log('[Enhanced v4.7] 完整版已加载 · 学习时间线 + 和风天气 + 讯飞语音 + 原生导入导出');
 })();
 </script>
 </body>

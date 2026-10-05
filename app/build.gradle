@@ -14,9 +14,24 @@ android {
         versionName "1.0"
     }
 
+    /* 关键：让 release 也用 debug 签名，避免“安装包没有签名文件” */
+    signingConfigs {
+        debug {
+            // 使用 Android 内置的 debug keystore
+            storeFile file("${System.properties['user.home']}/.android/debug.keystore")
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.debug   // 用 debug 签名
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -30,7 +45,6 @@ android {
         jniLibs { useLegacyPackaging = true }
     }
 
-    // 允许 libs 下的 .so 打包
     sourceSets {
         main {
             jniLibs.srcDirs = ['libs']
@@ -42,7 +56,8 @@ dependencies {
     implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.core:core:1.12.0'
-    // 讯飞 SparkChain 依赖（若 SparkChain.aar 已包含以下模块可删除）
+    /* 关键：WebViewAssetLoader 用于修麦克风 */
+    implementation 'androidx.webkit:webkit:1.8.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
 }
