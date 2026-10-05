@@ -434,14 +434,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .home-tl-item[data-home-action]{cursor:pointer}
 .home-tl-item[data-home-action]:active{background:#F5FBFA}
 .home-tl-item:not(:last-child)::after{content:'';position:absolute;left:29px;bottom:-6px;width:1.5px;height:14px;background:#E6E9F1}
-/* 时间线里的勾选圆圈，与 .check 共用样式，去掉上边距让它垂直居中 */
 .home-tl-item .check{margin-top:0}
-/* 已完成状态：文字变淡+删除线 */
 .home-tl-item.is-done .home-tl-text{color:#8A90A2}
 .home-tl-item.is-done .home-tl-text .tm{color:#B0B6C6}
 .home-tl-item.is-done .home-tl-text .sub{color:#B0B6C6}
-.home-tl-dot{width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #DDE2EC;flex:none;position:relative;z-index:1;box-sizing:content-box}
-.home-tl-item[data-home-action] .home-tl-dot{border-color:var(--accent)}
 .home-tl-text{flex:1;font-size:13.5px;color:#1B1F2A;line-height:1.5;min-width:0}
 .home-tl-text .tm{color:#8A90A2;font-size:11.5px;font-weight:600;margin-right:8px;font-variant-numeric:tabular-nums}
 .home-tl-text .sub{color:#8A90A2;font-size:11.5px;display:block;margin-top:2px;line-height:1.45}
@@ -470,16 +466,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
             <div class="temp" id="homeTemp">--℃</div>
           </div>
         </div>
-
         <div class="home-section-label" style="margin-top:4px">时间线 · 点击左侧圆圈打卡</div>
         <div class="home-tl-wrap" id="homeTlWrap"></div>
-
         <div class="home-section-label">今日皮肤状态</div>
         <div class="card" style="margin-top:0">
           <div class="card-title">今日皮肤状态 <span class="muted">点击切换护肤流程</span></div>
           <div class="opt-list" id="skinOptions"></div>
         </div>
-
         <div class="home-section-label">今日身体状态</div>
         <div class="card" style="margin-top:0">
           <div class="card-title">今日身体状态 <span class="muted">点击切换，同步调整计划</span></div>
@@ -996,7 +989,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 </div>
 
 <script>
-/* ===== 崩溃日志捕获 ===== */
+/* ===== 崩溃日志 ===== */
 (function(){
   function report(msg, stack){
     try {
@@ -1014,7 +1007,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
   });
 })();
 
-/* ===== Android APP native persistence bridge ===== */
+/* ===== Android 桥接 ===== */
 (function(){
   const _get = localStorage.getItem.bind(localStorage);
   const _set = localStorage.setItem.bind(localStorage);
@@ -1038,25 +1031,18 @@ const __nativeSetItem = window.__appStorageSet;
 const __nativeRemoveItem = window.__appStorageRemove;
 
 const Store = {
-  save(key, val){
-    try { __nativeSetItem('app_' + key, JSON.stringify(val)); }
-    catch(e){ console.warn('save fail', key, e); }
-  },
+  save(key, val){ try { __nativeSetItem('app_' + key, JSON.stringify(val)); } catch(e){ console.warn('save fail', key, e); } },
   load(key, def){
-    try {
-      const s = __nativeGetItem('app_' + key);
-      return s !== null ? JSON.parse(s) : def;
-    } catch(e){ return def; }
+    try { const s = __nativeGetItem('app_' + key); return s !== null ? JSON.parse(s) : def; }
+    catch(e){ return def; }
   }
 };
-function saveRaw(key, val){
-  try { __nativeSetItem(key, JSON.stringify(val)); } catch(e){}
-}
+function saveRaw(key, val){ try { __nativeSetItem(key, JSON.stringify(val)); } catch(e){} }
 function loadRaw(key, def){
   try { const s = __nativeGetItem(key); return s !== null ? JSON.parse(s) : def; } catch(e){ return def; }
 }
 
-/* ===== 衣橱图片 IndexedDB ===== */
+/* ===== IndexedDB 图片 ===== */
 const imageDB = {
   _db: null,
   open(){
@@ -1114,21 +1100,14 @@ async function getClothImageURL(c){
 }
 async function preloadAllImages(){
   for (const c of state.clothes) {
-    if (c.imageId && !imageCache[c.imageId]) {
-      await getClothImageURL(c);
-    }
+    if (c.imageId && !imageCache[c.imageId]) await getClothImageURL(c);
   }
 }
-async function dataURLToBlob(dataURL){
-  const res = await fetch(dataURL);
-  return await res.blob();
-}
+async function dataURLToBlob(dataURL){ const res = await fetch(dataURL); return await res.blob(); }
 
-/* ===== 每日独立勾选状态 ===== */
+/* ===== 勾选状态 ===== */
 const KEEP_DAYS = 14;
-function getChecks(){
-  try { return JSON.parse(__nativeGetItem('dailyChecks') || '{}'); } catch(e){ return {}; }
-}
+function getChecks(){ try { return JSON.parse(__nativeGetItem('dailyChecks') || '{}'); } catch(e){ return {}; } }
 function saveChecks(c){ __nativeSetItem('dailyChecks', JSON.stringify(c)); }
 function setCheck(key, on){
   const c = getChecks();
@@ -1187,7 +1166,7 @@ function csvEscape(v){
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
-/* ===== 训练起始日 ===== */
+/* ===== 计划起始日 ===== */
 let PLAN_START;
 (function(){
   const s = __nativeGetItem('planStartDate');
@@ -1219,9 +1198,7 @@ function setOverride(date, mode){
 function getOverride(date){ return getOverrides()[fmtDate(date)] || null; }
 
 /* ===== 待办状态 ===== */
-function getTodoStatusMap(){
-  try { return JSON.parse(__nativeGetItem('todoStatus') || '{}'); } catch(e){ return {}; }
-}
+function getTodoStatusMap(){ try { return JSON.parse(__nativeGetItem('todoStatus') || '{}'); } catch(e){ return {}; } }
 function saveTodoStatusMap(m){ __nativeSetItem('todoStatus', JSON.stringify(m)); }
 function getTodoKey(date, item){ return `${date}|${item.time || ''}|${item.title || ''}`; }
 function toggleTodo(date, item){
@@ -1232,21 +1209,13 @@ function toggleTodo(date, item){
   buildCalendarFromPlans();
   renderCalendar(); renderAllTodo(); renderUndone(); renderHomeTimeline();
 }
-function getManualTodos(){
-  try { return JSON.parse(__nativeGetItem('calendarManual') || '{}'); } catch(e){ return {}; }
-}
+function getManualTodos(){ try { return JSON.parse(__nativeGetItem('calendarManual') || '{}'); } catch(e){ return {}; } }
 function saveManualTodos(m){ __nativeSetItem('calendarManual', JSON.stringify(m)); }
 
-/* ===== 运动打卡 Session ===== */
-function getSportSessions(){
-  try { return JSON.parse(__nativeGetItem('sportSessions') || '{}'); } catch(e){ return {}; }
-}
+/* ===== 运动打卡 ===== */
+function getSportSessions(){ try { return JSON.parse(__nativeGetItem('sportSessions') || '{}'); } catch(e){ return {}; } }
 function saveSportSessions(s){ __nativeSetItem('sportSessions', JSON.stringify(s)); }
-function getSportSession(dateStr){
-  const d = dateStr || todayStr();
-  const all = getSportSessions();
-  return all[d] || null;
-}
+function getSportSession(dateStr){ const d = dateStr || todayStr(); const all = getSportSessions(); return all[d] || null; }
 function saveSportSession(sess, dateStr){
   const d = dateStr || todayStr();
   const all = getSportSessions();
@@ -1281,16 +1250,13 @@ function getYesterdayBody(){
   return past.length ? past[past.length - 1] : null;
 }
 
-/* ===== 记账分类学习 ===== */
 function learnNoteCategory(note, category){
   const t = String(note || '').trim();
   if (!t || !category) return;
   const map = Store.load('noteCategoryMap', {});
   map[t] = category;
   const keys = Object.keys(map);
-  if (keys.length > 300) {
-    keys.slice(0, 100).forEach(k => delete map[k]);
-  }
+  if (keys.length > 300) keys.slice(0, 100).forEach(k => delete map[k]);
   Store.save('noteCategoryMap', map);
 }
 
@@ -1323,8 +1289,7 @@ function classifySkinStep(name){
 function skinStepGroup(it){ return it.group || classifySkinStep(it.name); }
 function sortSkinSteps(list){
   const order = SKIN_STEP_ORDER.map(g => g.key);
-  return list
-    .map((it, i) => ({ it, i, g: order.indexOf(skinStepGroup(it)) }))
+  return list.map((it, i) => ({ it, i, g: order.indexOf(skinStepGroup(it)) }))
     .sort((a, b) => (a.g - b.g) || (a.i - b.i))
     .map(x => x.it);
 }
@@ -1333,7 +1298,6 @@ function skinGroupLabel(key){
   return g ? g.label : '其他';
 }
 
-/* ===== 计划属性 ===== */
 function getActualPlanForDate(date){
   const d0 = new Date(date); d0.setHours(0,0,0,0);
   const ov = getOverride(d0);
@@ -1416,132 +1380,70 @@ function getScheduleLabels(dow){
 
 function buildPlanByContent(wi, dow){
   const mk = (code, sets, reps, load) => ({ code, sets, reps, dose: reps, load, ...EXERCISES[code] });
-
   if (dow === 0) return {
     key:'monday', label:'臀腿 + 核心', icon:'✅', duration:'45–55 分钟',
-    summary:'臀腿 + 核心训练。动作以控制、稳定为主。',
-    isTraining:true,
+    summary:'臀腿 + 核心训练。动作以控制、稳定为主。', isTraining:true,
     warmup:[ mk('猫牛式',1,'10次','自重'), mk('髋关节绕环',1,'10次','自重'), mk('腹式呼吸',1,'2分钟','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('髋屈肌拉伸',1,'20–30秒','自重') ],
-    exercises:[
-      mk('椅子箱式深蹲', 3, '8–10次', '自重'),
-      mk('扶持分腿蹲', 2, '8次/侧', '自重'),
-      mk('臀桥', 3, '12–15次', '自重'),
-      mk('弹力带侧向走', 2, '8–10步/方向', '轻阻力'),
-      mk('Pallof抗旋转推', 2, '10次/侧', '轻阻力'),
-      mk('Dead Bug', 2, '6次/侧', '自重')
-    ],
+    exercises:[ mk('椅子箱式深蹲',3,'8–10次','自重'), mk('扶持分腿蹲',2,'8次/侧','自重'), mk('臀桥',3,'12–15次','自重'), mk('弹力带侧向走',2,'8–10步/方向','轻阻力'), mk('Pallof抗旋转推',2,'10次/侧','轻阻力'), mk('Dead Bug',2,'6次/侧','自重') ],
     tips:['降蹲不要到最低位，轻触椅面即可','骶髂疼时缩小幅度或改椅子坐站','侧向走不要左右晃臀']
   };
-
   if (dow === 1) return {
     key:'tuesday', label:'上肢 + 圆肩 + 颈肩稳定', icon:'💪', duration:'40–50 分钟',
-    summary:'改善圆肩，稳定颈肩，强化背部与肩袖。',
-    isTraining:true,
+    summary:'改善圆肩，稳定颈肩，强化背部与肩袖。', isTraining:true,
     warmup:[ mk('猫牛式',1,'10次','自重'), mk('腹式呼吸',1,'2分钟','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('肩胛放松',1,'10次','自重') ],
-    exercises:[
-      mk('弹力带划船', 3, '10–12次', '轻中阻力'),
-      mk('斜板墙壁俯卧撑', 2, '8–12次', '自重'),
-      mk('墙面滑臂', 2, '8–10次', '自重'),
-      mk('弹力带肩外旋', 2, '12次', '轻阻力'),
-      mk('下巴回收', 2, '8次，每次5秒', '自重'),
-      mk('站姿提踵', 2, '12–15次', '自重')
-    ],
+    exercises:[ mk('弹力带划船',3,'10–12次','轻中阻力'), mk('斜板墙壁俯卧撑',2,'8–12次','自重'), mk('墙面滑臂',2,'8–10次','自重'), mk('弹力带肩外旋',2,'12次','轻阻力'), mk('下巴回收',2,'8次，每次5秒','自重'), mk('站姿提踵',2,'12–15次','自重') ],
     tips:['做划船时肩膀不耸，胸口打开','俯卧撑不要一开始做地面','颈部紧张时改用更高墙面角度']
   };
-
   if (dow === 2) return {
     key:'wednesday', label:'恢复日 + 低强度有氧', icon:'🧘', duration:'40–50 分钟',
-    summary:'快走25–35分钟 + 轻柔活动10分钟 + 筋膜球5分钟。',
-    isTraining:true,
-    warmup:[ mk('腹式呼吸',1,'2分钟','自重') ],
-    stretch:[],
-    exercises:[
-      mk('快走', 1, '25–35分钟', '低强度'),
-      mk('猫牛式', 1, '10次', '轻柔'),
-      mk('筋膜球', 1, '5分钟', '每侧30–60秒×2轮')
-    ],
+    summary:'快走25–35分钟 + 轻柔活动10分钟 + 筋膜球5分钟。', isTraining:true,
+    warmup:[ mk('腹式呼吸',1,'2分钟','自重') ], stretch:[],
+    exercises:[ mk('快走',1,'25–35分钟','低强度'), mk('猫牛式',1,'10次','轻柔'), mk('筋膜球',1,'5分钟','每侧30–60秒×2轮') ],
     tips:['筋膜球不要直接压颈椎骨头、腰椎正中、骶髂关节骨性突起','压力以"酸胀、可接受"为准']
   };
-
   if (dow === 3) return {
     key:'thursday', label:'全身功能性力量', icon:'🏋️', duration:'45–55 分钟',
-    summary:'轻负荷，全身协调发力。',
-    isTraining:true,
+    summary:'轻负荷，全身协调发力。', isTraining:true,
     warmup:[ mk('猫牛式',1,'10次','自重'), mk('髋关节绕环',1,'10次','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('小腿拉伸',1,'20–30秒','自重') ],
-    exercises:[
-      mk('轻壶铃高杯深蹲', 3, '8–10次', '轻壶铃'),
-      mk('弹力带划船', 3, '10–12次', '轻中阻力'),
-      mk('臀桥', 3, '12次', '自重'),
-      mk('斜板墙壁俯卧撑', 2, '10次', '自重'),
-      mk('Pallof抗旋转推', 3, '8次/侧', '轻阻力'),
-      mk('Bird Dog', 2, '6次/侧', '自重')
-    ],
+    exercises:[ mk('轻壶铃高杯深蹲',3,'8–10次','轻壶铃'), mk('弹力带划船',3,'10–12次','轻中阻力'), mk('臀桥',3,'12次','自重'), mk('斜板墙壁俯卧撑',2,'10次','自重'), mk('Pallof抗旋转推',3,'8次/侧','轻阻力'), mk('Bird Dog',2,'6次/侧','自重') ],
     tips:['壶铃重量要轻','Bird Dog宁愿动作小，不要抬得非常高']
   };
-
   if (dow === 4) return {
     key:'friday', label:'体态修正 + 臀中肌 + 核心', icon:'💪', duration:'40–45 分钟',
-    summary:'体态修正 + 臀中肌 + 核心 + 轻松步行。',
-    isTraining:true,
+    summary:'体态修正 + 臀中肌 + 核心 + 轻松步行。', isTraining:true,
     warmup:[ mk('猫牛式',1,'10次','自重'), mk('腹式呼吸',1,'2分钟','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('髋屈肌拉伸',1,'20–30秒','自重') ],
-    exercises:[
-      mk('扶持分腿蹲', 2, '10次/侧', '自重'),
-      mk('弹力带侧向走', 2, '10步/方向', '轻阻力'),
-      mk('弹力带划船', 2, '12次', '轻中阻力'),
-      mk('墙面滑臂', 2, '8次', '自重'),
-      mk('Dead Bug', 2, '6次/侧', '自重'),
-      mk('散步', 1, '15–20分钟', '轻松')
-    ],
+    exercises:[ mk('扶持分腿蹲',2,'10次/侧','自重'), mk('弹力带侧向走',2,'10步/方向','轻阻力'), mk('弹力带划船',2,'12次','轻中阻力'), mk('墙面滑臂',2,'8次','自重'), mk('Dead Bug',2,'6次/侧','自重'), mk('散步',1,'15–20分钟','轻松') ],
     tips:['重点在动作控制，不追求大重量','疼痛加剧时立即停止']
   };
-
   if (dow === 5) return {
     key:'saturday', label:'游泳', icon:'🏊', duration:'40–60 分钟',
-    summary:'自由泳 + 仰泳自学。水下吐气，侧转吸气。',
-    isTraining:true,
+    summary:'自由泳 + 仰泳自学。水下吐气，侧转吸气。', isTraining:true,
     warmup:[ mk('站姿提踵',1,'15次','自重'), mk('髋关节绕环',1,'10次','自重'), mk('下巴回收',1,'8次','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('小腿拉伸',1,'20–30秒','自重'), mk('髋屈肌拉伸',1,'20–30秒','自重') ],
-    exercises:[
-      mk('游泳', 4, '25m', '漂浮/打腿'),
-      mk('自由泳', 4, '25m', '单臂/侧转呼吸'),
-      mk('仰泳', 1, '10分钟', '背部漂浮')
-    ],
+    exercises:[ mk('游泳',4,'25m','漂浮/打腿'), mk('自由泳',4,'25m','单臂/侧转呼吸'), mk('仰泳',1,'10分钟','背部漂浮') ],
     tips:['先学习身体位置，不要一开始游完整50米','眼睛看池底，不要抬头看前方','身体滚转 → 肩膀转 → 头部跟着转 → 嘴露出水面吸气']
   };
-
   return {
     key:'sunday', label:'主动恢复', icon:'😴', duration:'40–50 分钟',
-    summary:'散步20–30分钟 + 核心/肩胛轻训练10分钟 + 拉伸10分钟。',
-    isTraining:true,
+    summary:'散步20–30分钟 + 核心/肩胛轻训练10分钟 + 拉伸10分钟。', isTraining:true,
     warmup:[ mk('腹式呼吸',1,'2分钟','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('小腿拉伸',1,'20–30秒','自重'), mk('髋屈肌拉伸',1,'20–30秒','自重') ],
-    exercises:[
-      mk('散步', 1, '20–30分钟', '轻松'),
-      mk('Dead Bug', 2, '6次/侧', '自重'),
-      mk('弹力带划船', 2, '12次', '轻阻力'),
-      mk('肩胛放松', 1, '10次', '自重')
-    ],
+    exercises:[ mk('散步',1,'20–30分钟','轻松'), mk('Dead Bug',2,'6次/侧','自重'), mk('弹力带划船',2,'12次','轻阻力'), mk('肩胛放松',1,'10次','自重') ],
     tips:['不追求强度，让身体恢复','注意睡眠与饮水']
   };
 }
-
 function buildSwimReplacement(){
   const mk = (code, sets, reps, load) => ({ code, sets, reps, dose: reps, load, ...EXERCISES[code] });
   return {
     key:'swim', label:'游泳代替', icon:'🏊', duration:'40–60 分钟',
-    summary:'游泳代替今日计划 · 原训练顺延',
-    isTraining:true,
+    summary:'游泳代替今日计划 · 原训练顺延', isTraining:true,
     warmup:[ mk('猫牛式',1,'10次','自重'), mk('髋关节绕环',1,'10次','自重') ],
     stretch:[ mk('胸肌拉伸',1,'20–30秒','自重'), mk('小腿拉伸',1,'20–30秒','自重') ],
-    exercises:[
-      mk('游泳', 4, '25m', '漂浮/打腿'),
-      mk('自由泳', 4, '25m', '单臂/侧转呼吸'),
-      mk('仰泳', 1, '10分钟', '放松')
-    ],
+    exercises:[ mk('游泳',4,'25m','漂浮/打腿'), mk('自由泳',4,'25m','单臂/侧转呼吸'), mk('仰泳',1,'10分钟','放松') ],
     tips:['以水感与技术为主。','水下吐气，侧转吸气。']
   };
 }
@@ -1586,78 +1488,10 @@ const BODY_GROUPS = [
 const BODY_FIELDS = BODY_GROUPS.flatMap(g=>g.fields.map(f=>f.key));
 
 const HOLIDAYS = {
-  '2025-01-01':'元旦','2025-01-28':'除夕','2025-01-29':'春节','2025-01-30':'初二','2025-01-31':'初三',
-  '2025-02-01':'初四','2025-02-02':'初五','2025-02-03':'初六','2025-02-04':'初七',
-  '2025-02-14':'情人节','2025-03-08':'妇女节','2025-03-12':'植树节',
-  '2025-04-04':'清明','2025-04-05':'清明','2025-04-06':'清明',
-  '2025-05-01':'劳动节','2025-05-02':'劳动节','2025-05-03':'劳动节','2025-05-04':'劳动节','2025-05-05':'劳动节',
-  '2025-05-11':'母亲节','2025-05-31':'端午','2025-06-01':'儿童节','2025-06-02':'端午',
-  '2025-06-15':'父亲节','2025-07-01':'建党节','2025-08-01':'建军节',
-  '2025-09-10':'教师节','2025-09-25':'中秋','2025-09-26':'中秋',
-  '2025-10-01':'国庆','2025-10-02':'国庆','2025-10-03':'国庆','2025-10-04':'国庆','2025-10-05':'国庆',
-  '2025-10-06':'国庆','2025-10-07':'国庆','2025-10-08':'国庆','2025-10-29':'重阳',
-  '2025-11-27':'感恩节','2025-12-24':'平安夜','2025-12-25':'圣诞节',
-  '2026-01-01':'元旦','2026-02-14':'情人节',
-  '2026-02-17':'春节','2026-02-18':'初二','2026-02-19':'初三','2026-02-20':'初四',
-  '2026-02-21':'初五','2026-02-22':'初六','2026-02-23':'初七',
-  '2026-03-08':'妇女节','2026-03-12':'植树节',
-  '2026-04-04':'清明','2026-04-05':'清明','2026-04-06':'清明',
-  '2026-05-01':'劳动节','2026-05-02':'劳动节','2026-05-03':'劳动节','2026-05-04':'劳动节','2026-05-05':'劳动节',
-  '2026-05-10':'母亲节','2026-06-01':'儿童节','2026-06-19':'端午','2026-06-21':'父亲节',
-  '2026-07-01':'建党节','2026-08-01':'建军节',
-  '2026-09-10':'教师节','2026-09-25':'中秋',
-  '2026-10-01':'国庆','2026-10-02':'国庆','2026-10-03':'国庆','2026-10-04':'国庆','2026-10-05':'国庆',
-  '2026-10-06':'国庆','2026-10-07':'国庆','2026-10-08':'国庆','2026-10-18':'重阳',
-  '2026-11-26':'感恩节','2026-12-24':'平安夜','2026-12-25':'圣诞节',
-  '2027-01-01':'元旦',
-  '2027-02-06':'春节','2027-02-07':'初二','2027-02-08':'初三','2027-02-09':'初四',
-  '2027-02-10':'初五','2027-02-11':'初六','2027-02-12':'初七',
-  '2027-03-08':'妇女节','2027-03-12':'植树节',
-  '2027-04-04':'清明','2027-04-05':'清明',
-  '2027-05-01':'劳动节','2027-05-02':'劳动节','2027-05-03':'劳动节','2027-05-04':'劳动节','2027-05-05':'劳动节',
-  '2027-05-09':'母亲节','2027-06-01':'儿童节','2027-06-09':'端午','2027-06-20':'父亲节',
-  '2027-07-01':'建党节','2027-08-01':'建军节',
-  '2027-09-10':'教师节','2027-09-15':'中秋',
-  '2027-10-01':'国庆','2027-10-02':'国庆','2027-10-03':'国庆','2027-10-04':'国庆','2027-10-05':'国庆',
-  '2027-10-06':'国庆','2027-10-07':'国庆','2027-10-08':'国庆',
-  '2027-11-25':'感恩节','2027-12-24':'平安夜','2027-12-25':'圣诞节',
-  '2028-01-01':'元旦','2028-01-25':'除夕',
-  '2028-01-26':'春节','2028-01-27':'初二','2028-01-28':'初三','2028-01-29':'初四',
-  '2028-01-30':'初五','2028-01-31':'初六','2028-02-01':'初七',
-  '2028-02-14':'情人节','2028-03-08':'妇女节','2028-03-12':'植树节',
-  '2028-04-04':'清明','2028-04-05':'清明',
-  '2028-05-01':'劳动节','2028-05-02':'劳动节','2028-05-03':'劳动节','2028-05-04':'劳动节','2028-05-05':'劳动节',
-  '2028-05-14':'母亲节','2028-05-28':'端午','2028-06-01':'儿童节','2028-06-18':'父亲节',
-  '2028-07-01':'建党节','2028-08-01':'建军节',
-  '2028-09-10':'教师节',
-  '2028-10-01':'国庆','2028-10-02':'国庆','2028-10-03':'国庆','2028-10-04':'国庆','2028-10-05':'国庆',
-  '2028-10-06':'国庆','2028-10-07':'国庆','2028-10-08':'国庆',
-  '2028-10-03':'中秋','2028-10-26':'重阳',
-  '2028-11-23':'感恩节','2028-12-24':'平安夜','2028-12-25':'圣诞节',
-  '2029-01-01':'元旦','2029-02-12':'除夕',
-  '2029-02-13':'春节','2029-02-14':'初二','2029-02-15':'初三','2029-02-16':'初四',
-  '2029-02-17':'初五','2029-02-18':'初六','2029-02-19':'初七',
-  '2029-03-08':'妇女节','2029-03-12':'植树节',
-  '2029-04-04':'清明','2029-04-05':'清明',
-  '2029-05-01':'劳动节','2029-05-02':'劳动节','2029-05-03':'劳动节','2029-05-04':'劳动节','2029-05-05':'劳动节',
-  '2029-05-13':'母亲节','2029-06-01':'儿童节','2029-06-16':'端午','2029-06-17':'父亲节',
-  '2029-07-01':'建党节','2029-08-01':'建军节',
-  '2029-09-10':'教师节','2029-09-22':'中秋',
-  '2029-10-01':'国庆','2029-10-02':'国庆','2029-10-03':'国庆','2029-10-04':'国庆','2029-10-05':'国庆',
-  '2029-10-06':'国庆','2029-10-07':'国庆','2029-10-08':'国庆','2029-10-16':'重阳',
-  '2029-11-22':'感恩节','2029-12-24':'平安夜','2029-12-25':'圣诞节',
-  '2030-01-01':'元旦','2030-02-02':'除夕',
-  '2030-02-03':'春节','2030-02-04':'初二','2030-02-05':'初三','2030-02-06':'初四',
-  '2030-02-07':'初五','2030-02-08':'初六','2030-02-09':'初七',
-  '2030-03-08':'妇女节','2030-03-12':'植树节',
-  '2030-04-04':'清明','2030-04-05':'清明',
-  '2030-05-01':'劳动节','2030-05-02':'劳动节','2030-05-03':'劳动节','2030-05-04':'劳动节','2030-05-05':'劳动节',
-  '2030-05-12':'母亲节','2030-06-01':'儿童节','2030-06-05':'端午','2030-06-16':'父亲节',
-  '2030-07-01':'建党节','2030-08-01':'建军节',
-  '2030-09-10':'教师节','2030-09-12':'中秋',
-  '2030-10-01':'国庆','2030-10-02':'国庆','2030-10-03':'国庆','2030-10-04':'国庆','2030-10-05':'国庆',
-  '2030-10-06':'国庆','2030-10-07':'国庆','2030-10-08':'国庆',
-  '2030-11-28':'感恩节','2030-12-24':'平安夜','2030-12-25':'圣诞节'
+  '2025-01-01':'元旦','2025-01-28':'除夕','2025-01-29':'春节','2025-01-30':'初二','2025-01-31':'初三','2025-02-01':'初四','2025-02-02':'初五','2025-02-03':'初六','2025-02-04':'初七','2025-02-14':'情人节','2025-03-08':'妇女节','2025-03-12':'植树节','2025-04-04':'清明','2025-04-05':'清明','2025-04-06':'清明','2025-05-01':'劳动节','2025-05-02':'劳动节','2025-05-03':'劳动节','2025-05-04':'劳动节','2025-05-05':'劳动节','2025-05-11':'母亲节','2025-05-31':'端午','2025-06-01':'儿童节','2025-06-02':'端午','2025-06-15':'父亲节','2025-07-01':'建党节','2025-08-01':'建军节','2025-09-10':'教师节','2025-09-25':'中秋','2025-09-26':'中秋','2025-10-01':'国庆','2025-10-02':'国庆','2025-10-03':'国庆','2025-10-04':'国庆','2025-10-05':'国庆','2025-10-06':'国庆','2025-10-07':'国庆','2025-10-08':'国庆','2025-10-29':'重阳','2025-11-27':'感恩节','2025-12-24':'平安夜','2025-12-25':'圣诞节',
+  '2026-01-01':'元旦','2026-02-14':'情人节','2026-02-17':'春节','2026-02-18':'初二','2026-02-19':'初三','2026-02-20':'初四','2026-02-21':'初五','2026-02-22':'初六','2026-02-23':'初七','2026-03-08':'妇女节','2026-03-12':'植树节','2026-04-04':'清明','2026-04-05':'清明','2026-04-06':'清明','2026-05-01':'劳动节','2026-05-02':'劳动节','2026-05-03':'劳动节','2026-05-04':'劳动节','2026-05-05':'劳动节','2026-05-10':'母亲节','2026-06-01':'儿童节','2026-06-19':'端午','2026-06-21':'父亲节','2026-07-01':'建党节','2026-08-01':'建军节','2026-09-10':'教师节','2026-09-25':'中秋','2026-10-01':'国庆','2026-10-02':'国庆','2026-10-03':'国庆','2026-10-04':'国庆','2026-10-05':'国庆','2026-10-06':'国庆','2026-10-07':'国庆','2026-10-08':'国庆','2026-10-18':'重阳','2026-11-26':'感恩节','2026-12-24':'平安夜','2026-12-25':'圣诞节',
+  '2027-01-01':'元旦','2027-02-06':'春节','2027-02-07':'初二','2027-02-08':'初三','2027-02-09':'初四','2027-02-10':'初五','2027-02-11':'初六','2027-02-12':'初七','2027-03-08':'妇女节','2027-03-12':'植树节','2027-04-04':'清明','2027-04-05':'清明','2027-05-01':'劳动节','2027-05-02':'劳动节','2027-05-03':'劳动节','2027-05-04':'劳动节','2027-05-05':'劳动节','2027-05-09':'母亲节','2027-06-01':'儿童节','2027-06-09':'端午','2027-06-20':'父亲节','2027-07-01':'建党节','2027-08-01':'建军节','2027-09-10':'教师节','2027-09-15':'中秋','2027-10-01':'国庆','2027-10-02':'国庆','2027-10-03':'国庆','2027-10-04':'国庆','2027-10-05':'国庆','2027-10-06':'国庆','2027-10-07':'国庆','2027-10-08':'国庆','2027-11-25':'感恩节','2027-12-24':'平安夜','2027-12-25':'圣诞节',
+  '2028-01-01':'元旦','2028-01-25':'除夕','2028-01-26':'春节','2028-01-27':'初二','2028-01-28':'初三','2028-01-29':'初四','2028-01-30':'初五','2028-01-31':'初六','2028-02-01':'初七','2028-02-14':'情人节','2028-03-08':'妇女节','2028-03-12':'植树节','2028-04-04':'清明','2028-04-05':'清明','2028-05-01':'劳动节','2028-05-02':'劳动节','2028-05-03':'劳动节','2028-05-04':'劳动节','2028-05-05':'劳动节','2028-05-14':'母亲节','2028-05-28':'端午','2028-06-01':'儿童节','2028-06-18':'父亲节','2028-07-01':'建党节','2028-08-01':'建军节','2028-09-10':'教师节','2028-10-01':'国庆','2028-10-02':'国庆','2028-10-03':'国庆','2028-10-04':'国庆','2028-10-05':'国庆','2028-10-06':'国庆','2028-10-07':'国庆','2028-10-08':'国庆','2028-10-03':'中秋','2028-10-26':'重阳','2028-11-23':'感恩节','2028-12-24':'平安夜','2028-12-25':'圣诞节'
 };
 
 const state = {
@@ -1682,12 +1516,12 @@ const state = {
   pendingTx: null,
   clothes: loadRaw('clothes', []),
   supplements: Store.load('supplements', [
-    { id:1, name:'复合维生素B',  dose:'1 粒',   time:'早餐后',           expiry:'' },
-    { id:2, name:'维生素D/E',    dose:'1 粒',   time:'早餐后',           expiry:'' },
-    { id:3, name:'VC',           dose:'1 片',   time:'午餐后',           expiry:'' },
-    { id:4, name:'葡萄糖酸锌',   dose:'1 片',   time:'晚餐后',           expiry:'' },
-    { id:5, name:'蛋白粉',       dose:'20–25g', time:'训练后',           expiry:'' },
-    { id:6, name:'谷维素',       dose:'1 片',   time:'睡前（需要时）',   expiry:'' }
+    { id:1, name:'复合维生素B', dose:'1 粒', time:'早餐后', expiry:'' },
+    { id:2, name:'维生素D/E', dose:'1 粒', time:'早餐后', expiry:'' },
+    { id:3, name:'VC', dose:'1 片', time:'午餐后', expiry:'' },
+    { id:4, name:'葡萄糖酸锌', dose:'1 片', time:'晚餐后', expiry:'' },
+    { id:5, name:'蛋白粉', dose:'20–25g', time:'训练后', expiry:'' },
+    { id:6, name:'谷维素', dose:'1 片', time:'睡前（需要时）', expiry:'' }
   ]),
   transactions: (function(){
     const s = __nativeGetItem('transactions');
@@ -1700,7 +1534,7 @@ const state = {
   search: { todo: '', tx: '', clothes: '' }
 };
 
-/* ===== 和风天气 API ===== */
+/* ===== 和风天气 ===== */
 const QWEATHER = {
   API_KEY: 'c623ca2743e74883a3ead88b8a4170ec',
   API_HOST: 'nr3qquchga.re.qweatherapi.com'
@@ -1723,14 +1557,10 @@ async function fetchWeatherAndUpdate(){
     try {
       const pos = await new Promise((resolve, reject) => {
         if (!navigator.geolocation) return reject(new Error('no geolocation'));
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          timeout: 5000,
-          maximumAge: 30 * 60 * 1000
-        });
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, maximumAge: 30 * 60 * 1000 });
       });
       location = `${pos.coords.longitude.toFixed(2)},${pos.coords.latitude.toFixed(2)}`;
     } catch(e) {}
-
     const url = `https://${QWEATHER.API_HOST}/v7/weather/now?location=${encodeURIComponent(location)}&key=${QWEATHER.API_KEY}`;
     const res = await fetch(url);
     const data = await res.json();
@@ -1754,7 +1584,6 @@ async function fetchWeatherAndUpdate(){
   }
 }
 
-/* ===== 日历 ===== */
 function buildCalendarFromPlans(){
   const data = {};
   const start = new Date(PLAN_START); start.setDate(start.getDate() - 7);
@@ -1796,7 +1625,7 @@ function buildCalendarFromPlans(){
   state.calendarData = data;
 }
 
-/* ===== 记账 ===== */
+/* ===== 记账分类 ===== */
 const EXPENSE_CATS = [
   ['餐饮', /(餐饮|早餐|午餐|晚餐|夜宵|吃|饭|餐|咖啡|奶茶|外卖|水果|零食|饮料|火锅|烧烤|食堂|小吃|买菜)/],
   ['交通', /(交通|打车|公交|地铁|加油|停车|高铁|火车|机票|车费|滴滴|出租|单车|过路费)/],
@@ -1837,8 +1666,7 @@ function parseChineseAmount(str){
   const jiaoM = s.match(/(\d+)\s*[毛角]/);
   const fenM  = s.match(/(\d+)\s*分/);
   if (yuanM) {
-    amount = parseFloat(yuanM[1]);
-    matched = true;
+    amount = parseFloat(yuanM[1]); matched = true;
     if (jiaoM && jiaoM.index > yuanM.index) {
       amount += parseFloat(jiaoM[1]) / 10;
       if (fenM && fenM.index > jiaoM.index) amount += parseFloat(fenM[1]) / 100;
@@ -1848,12 +1676,10 @@ function parseChineseAmount(str){
       if (m2 && parseFloat(m2[1]) < 10) amount += parseFloat(m2[1]) / 10;
     }
   } else if (jiaoM) {
-    amount = parseFloat(jiaoM[1]) / 10;
-    matched = true;
+    amount = parseFloat(jiaoM[1]) / 10; matched = true;
     if (fenM && fenM.index > jiaoM.index) amount += parseFloat(fenM[1]) / 100;
   } else if (fenM) {
-    amount = parseFloat(fenM[1]) / 100;
-    matched = true;
+    amount = parseFloat(fenM[1]) / 100; matched = true;
   }
   if (!matched) {
     const m = s.match(/(\d+(?:\.\d+)?)/);
@@ -1861,7 +1687,6 @@ function parseChineseAmount(str){
   }
   return Math.round(amount * 100) / 100;
 }
-
 function parseTransactionText(text){
   const t = String(text || '').trim();
   const amount = parseChineseAmount(t);
@@ -1884,24 +1709,15 @@ function renderTxEditor(){
   const p = state.pendingTx;
   const box = $('#txEdit');
   const confirmBtn = $('#confirmTxBtn');
-  if (!p) {
-    box.classList.remove('show');
-    if (confirmBtn) confirmBtn.textContent = '✓ 确认记账';
-    return;
-  }
+  if (!p) { box.classList.remove('show'); if (confirmBtn) confirmBtn.textContent = '✓ 确认记账'; return; }
   box.classList.add('show');
   if (confirmBtn) confirmBtn.textContent = p.editingId ? '✓ 保存修改' : '✓ 确认记账';
   $('#txAmount').value = p.amount || '';
   $('#txNote').value = p.note || '';
   $$('#txTypeChips .cat-chip').forEach(c => c.classList.toggle('active', c.dataset.txtype === p.type));
   const cats = getCatList(p.type);
-  $('#txCatChips').innerHTML = cats.map(c =>
-    `<span class="cat-chip ${c === p.category ? 'active' : ''}" data-catpick="${c}">${c}</span>`
-  ).join('') + `<span class="cat-chip newcat" data-newcat="1">＋ 新增分类</span>`;
-  $('#asrChips').innerHTML =
-    `<span class="chip primary">${p.editingId ? '编辑中' : (p.type === 'income' ? '收入' : '支出')}</span>` +
-    `<span class="chip">${p.category}</span>` +
-    `<span class="chip">¥ ${(p.amount || 0).toFixed(2)}</span>`;
+  $('#txCatChips').innerHTML = cats.map(c => `<span class="cat-chip ${c === p.category ? 'active' : ''}" data-catpick="${c}">${c}</span>`).join('') + `<span class="cat-chip newcat" data-newcat="1">＋ 新增分类</span>`;
+  $('#asrChips').innerHTML = `<span class="chip primary">${p.editingId ? '编辑中' : (p.type === 'income' ? '收入' : '支出')}</span>` + `<span class="chip">${p.category}</span>` + `<span class="chip">¥ ${(p.amount || 0).toFixed(2)}</span>`;
 }
 function prepareTransaction(text){
   const t = String(text || '').trim();
@@ -1917,23 +1733,17 @@ function editTransaction(id){
   const moneyPage = document.getElementById('p-money');
   const firstSub = moneyPage && moneyPage.querySelector('.subnav .sub-item');
   if (firstSub && !firstSub.classList.contains('active')) firstSub.click();
-  state.pendingTx = {
-    type: tx.type, amount: tx.amount, category: tx.category,
-    note: tx.note || '', editingId: tx.id
-  };
+  state.pendingTx = { type: tx.type, amount: tx.amount, category: tx.category, note: tx.note || '', editingId: tx.id };
   $('#asrText').textContent = `编辑：${tx.note || tx.category}`;
   $('#asrTag').textContent = '编辑中';
   renderTxEditor();
   document.querySelectorAll('.tx.editing').forEach(el => el.classList.remove('editing'));
   const cur = document.querySelector(`.tx[data-tx-id="${tx.id}"]`);
   if (cur) cur.classList.add('editing');
-  setTimeout(() => {
-    const editBox = document.getElementById('txEdit');
-    if (editBox) editBox.scrollIntoView({ behavior:'smooth', block:'center' });
-  }, 220);
+  setTimeout(() => { const editBox = document.getElementById('txEdit'); if (editBox) editBox.scrollIntoView({ behavior:'smooth', block:'center' }); }, 220);
 }
 
-/* ===== 讯飞语音识别（WebSocket + Web Crypto） ===== */
+/* ===== 讯飞语音识别 ===== */
 const XUNFEI_CONFIG = {
   APPID: '4c627b59',
   API_SECRET: 'YzI1MDJmYWM0NTliNzNkMjI3NGIyM2Uz',
@@ -1941,26 +1751,11 @@ const XUNFEI_CONFIG = {
   HOST: 'iat-api.xfyun.cn',
   PATH: '/v2/iat'
 };
-const xfState = {
-  ws: null,
-  audioCtx: null,
-  stream: null,
-  processor: null,
-  status: 0,
-  result: '',
-  active: false,
-  timer: null
-};
+const xfState = { ws: null, audioCtx: null, stream: null, processor: null, status: 0, result: '', active: false, timer: null };
 async function buildXunfeiWsUrl(){
   const date = new Date().toUTCString();
   const signatureOrigin = `host: ${XUNFEI_CONFIG.HOST}\ndate: ${date}\nGET ${XUNFEI_CONFIG.PATH} HTTP/1.1`;
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(XUNFEI_CONFIG.API_SECRET),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(XUNFEI_CONFIG.API_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signatureOrigin));
   const sigBytes = new Uint8Array(sigBuf);
   let sigBin = '';
@@ -1995,30 +1790,16 @@ function sendXunfeiAudio(float32){
   let bin = '';
   for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
   const audioB64 = btoa(bin);
-
-  const frame = {
-    data: {
-      status: xfState.status,
-      format: 'audio/L16;rate=16000',
-      encoding: 'raw',
-      audio: audioB64
-    }
-  };
+  const frame = { data: { status: xfState.status, format: 'audio/L16;rate=16000', encoding: 'raw', audio: audioB64 } };
   if (xfState.status === 0) {
     frame.common = { app_id: XUNFEI_CONFIG.APPID };
-    frame.business = {
-      language: 'zh_cn',
-      domain: 'iat',
-      accent: 'mandarin',
-      vad_eos: 5000
-    };
+    frame.business = { language: 'zh_cn', domain: 'iat', accent: 'mandarin', vad_eos: 5000 };
   }
   try { xfState.ws.send(JSON.stringify(frame)); } catch(e){ console.warn('send audio failed', e); }
   if (xfState.status === 0) xfState.status = 1;
 }
 async function startXunfeiVoice(){
   if (xfState.active) { stopXunfeiVoice(); return; }
-
   const micHint = document.querySelector('#micHint');
   const asrTag = document.querySelector('#asrTag');
   try {
@@ -2026,16 +1807,13 @@ async function startXunfeiVoice(){
     xfState.result = '';
     xfState.status = 0;
     xfState.ws = new WebSocket(url);
-
     xfState.ws.onopen = async () => {
       xfState.active = true;
       updateVoiceUI(true);
       if (asrTag) asrTag.textContent = '聆听中';
       if (micHint) micHint.textContent = '正在聆听…（再次点击麦克风结束）';
       try {
-        xfState.stream = await navigator.mediaDevices.getUserMedia({
-          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
-        });
+        xfState.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         xfState.audioCtx = new AudioCtx();
         const srcRate = xfState.audioCtx.sampleRate;
@@ -2059,15 +1837,10 @@ async function startXunfeiVoice(){
       clearTimeout(xfState.timer);
       xfState.timer = setTimeout(() => { stopXunfeiVoice(); }, getVoiceDuration());
     };
-
     xfState.ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
-        if (data.code !== 0) {
-          console.error('讯飞错误', data);
-          handleXunfeiFinish(true, data.message || ('code ' + data.code));
-          return;
-        }
+        if (data.code !== 0) { console.error('讯飞错误', data); handleXunfeiFinish(true, data.message || ('code ' + data.code)); return; }
         if (data.data && data.data.result) {
           const ws = data.data.result.ws;
           let text = '';
@@ -2078,22 +1851,11 @@ async function startXunfeiVoice(){
           const tag = document.querySelector('#asrTag');
           if (tag) tag.textContent = '识别中';
         }
-        if (data.data && data.data.status === 2) {
-          handleXunfeiFinish(false);
-        }
+        if (data.data && data.data.status === 2) handleXunfeiFinish(false);
       } catch(err) { console.error('解析讯飞消息失败', err); }
     };
-
-    xfState.ws.onerror = (e) => {
-      console.error('讯飞 WebSocket 错误', e);
-      handleXunfeiFinish(true, '网络连接失败');
-    };
-    xfState.ws.onclose = () => {
-      if (xfState.active) {
-        xfState.active = false;
-        updateVoiceUI(false);
-      }
-    };
+    xfState.ws.onerror = () => { console.error('讯飞 WebSocket 错误'); handleXunfeiFinish(true, '网络连接失败'); };
+    xfState.ws.onclose = () => { if (xfState.active) { xfState.active = false; updateVoiceUI(false); } };
   } catch(e) {
     console.error('启动讯飞语音失败', e);
     if (asrTag) asrTag.textContent = '失败';
@@ -2107,19 +1869,13 @@ function stopXunfeiVoice(){
   updateVoiceUI(false);
   const micHint = document.querySelector('#micHint');
   if (micHint) micHint.textContent = '已结束，识别中…';
-
   if (xfState.processor) { try { xfState.processor.disconnect(); } catch(e){} xfState.processor = null; }
   if (xfState.stream) { try { xfState.stream.getTracks().forEach(t => t.stop()); } catch(e){} xfState.stream = null; }
-
   if (xfState.ws && xfState.ws.readyState === WebSocket.OPEN) {
-    const frame = {
-      data: { status: 2, format: 'audio/L16;rate=16000', encoding: 'raw', audio: '' }
-    };
+    const frame = { data: { status: 2, format: 'audio/L16;rate=16000', encoding: 'raw', audio: '' } };
     try { xfState.ws.send(JSON.stringify(frame)); } catch(e){}
     setTimeout(() => {
-      if (xfState.ws && xfState.ws.readyState === WebSocket.OPEN) {
-        try { xfState.ws.close(); } catch(e){}
-      }
+      if (xfState.ws && xfState.ws.readyState === WebSocket.OPEN) { try { xfState.ws.close(); } catch(e){} }
       xfState.ws = null;
       handleXunfeiFinish(false);
     }, 2000);
@@ -2147,8 +1903,6 @@ function handleXunfeiFinish(error, msg){
     document.querySelector('#textInputArea')?.classList.add('show');
   }
 }
-
-/* ===== 浏览器原生语音（备选） ===== */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null, isListening = false;
 function getVoiceDuration(){
@@ -2207,10 +1961,7 @@ function startVoice(){
       return;
     } catch(e) { console.error('原生语音启动失败', e); }
   }
-  if (typeof WebSocket !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    startXunfeiVoice();
-    return;
-  }
+  if (typeof WebSocket !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) { startXunfeiVoice(); return; }
   if (!recognition) {
     const asrTag = document.querySelector('#asrTag');
     if (asrTag) asrTag.textContent = '不可用';
@@ -2338,20 +2089,27 @@ function renderExportPreview(){
   const totalInc = list.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
   $('#exportPreview').innerHTML = `记录数：${list.length} 条<br>支出合计：¥ ${totalExp.toFixed(2)}<br>收入合计：¥ ${totalInc.toFixed(2)}`;
 }
+
+/* ★ 修改：导出 CSV 走原生桥接 */
 function exportCSV(){
   const list = getRangeTransactions();
   if (!list.length) { alert('所选时间范围内没有记录'); return; }
   const rows = [['日期','时间','金额','类型','分类','备注']];
   list.forEach(t => rows.push([t.date, t.time, t.amount, t.type === 'income' ? '收入' : '支出', t.category, t.note]));
   const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+  const rangeLabel = { month:'本月', lastMonth:'上月', '3months':'近3月', all:'全部' }[state.exportRange];
+  const filename = `账单_${rangeLabel}_${todayStr()}.csv`;
+  if (window.AndroidBridge && typeof AndroidBridge.saveCsv === 'function') {
+    try { AndroidBridge.saveCsv('\ufeff' + csv, filename); return; }
+    catch(e) { console.warn('saveCsv failed', e); }
+  }
   const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url;
-  const rangeLabel = { month:'本月', lastMonth:'上月', '3months':'近3月', all:'全部' }[state.exportRange];
-  a.download = `账单_${rangeLabel}_${todayStr()}.csv`; a.click(); URL.revokeObjectURL(url);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 3000);
 }
 
-/* ===== 日历渲染 ===== */
 function renderCalendar(){
   const y = state.calYear, m = state.calMonth;
   $('#calMonthLabel').textContent = `${y} 年 ${m + 1} 月`;
@@ -2375,7 +2133,6 @@ function renderCalendar(){
   const rest = (7 - totalCells % 7) % 7;
   for (let i = 0; i < rest; i++) html += '<div class="empty"></div>';
   $('#calGrid').innerHTML = html;
-
   const list = (state.calendarData[state.selectedDate] || []).slice().sort((a,b) => (a.time||'').localeCompare(b.time||''));
   const dt = new Date(state.selectedDate + 'T00:00:00');
   const label = `${dt.getMonth()+1} 月 ${dt.getDate()} 日`;
@@ -2404,10 +2161,7 @@ function getSortedTodoItems(){
   Object.entries(state.calendarData).forEach(([date, list]) => {
     (list || []).forEach(it => items.push({ date, time: it.time || '', title: it.title || '', desc: it.desc || '', done: !!it.done, manual: !!it.manual }));
   });
-  items.sort((a,b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return (a.time || '').localeCompare(b.time || '');
-  });
+  items.sort((a,b) => { if (a.date !== b.date) return a.date.localeCompare(b.date); return (a.time || '').localeCompare(b.time || ''); });
   return items;
 }
 function todoRowHTML(it, today){
@@ -2428,8 +2182,7 @@ function renderAllTodo(){
   let items = getSortedTodoItems();
   if (q) items = items.filter(i => (i.title + ' ' + (i.desc || '')).toLowerCase().indexOf(q) >= 0);
   if (!items.length) { $('#allTodoList').innerHTML = '<p class="tip" style="color:#8A90A2">暂无待办事项</p>'; return; }
-  let html = '';
-  let lastDate = '';
+  let html = '', lastDate = '';
   items.forEach(it => {
     if (it.date !== lastDate) {
       lastDate = it.date;
@@ -2451,8 +2204,7 @@ function renderUndone(){
   if (q) items = items.filter(i => (i.title + ' ' + (i.desc || '')).toLowerCase().indexOf(q) >= 0);
   $('#undoneCount').textContent = `${items.length} 项`;
   if (!items.length) { $('#undoneList').innerHTML = '<p class="tip" style="color:#8A90A2">没有未完成的事项 🎉</p>'; return; }
-  let html = '';
-  let lastDate = '';
+  let html = '', lastDate = '';
   items.forEach(it => {
     if (it.date !== lastDate) {
       lastDate = it.date;
@@ -2467,13 +2219,7 @@ function renderUndone(){
   });
   $('#undoneList').innerHTML = html;
 }
-function openTodoSheet(){
-  if (isSuppressed()) return;
-  closeAllSheets();
-  $('#todoDate').value = state.selectedDate;
-  $('#todoSheet').classList.add('show');
-  $('#todoMask').classList.add('show');
-}
+function openTodoSheet(){ if (isSuppressed()) return; closeAllSheets(); $('#todoDate').value = state.selectedDate; $('#todoSheet').classList.add('show'); $('#todoMask').classList.add('show'); }
 function closeTodoSheet(){ $('#todoSheet').classList.remove('show'); $('#todoMask').classList.remove('show'); }
 function saveTodo(){
   const date = $('#todoDate').value, time = $('#todoTime').value;
@@ -2554,11 +2300,7 @@ function calcShape(){
   if (h - s >= 6) return { name:'梨形', desc:'臀胯偏宽，腰线平缓' };
   return { name:'矩形', desc:'肩腰臀比例接近' };
 }
-function renderShape(){
-  const sh = calcShape();
-  $('#shapeValue').textContent = sh.name;
-  $('#shapeDesc').textContent = sh.desc;
-}
+function renderShape(){ const sh = calcShape(); $('#shapeValue').textContent = sh.name; $('#shapeDesc').textContent = sh.desc; }
 function fitEase(ease, soft, hard){
   if (ease < -hard) return { k:'tight', t:'偏紧' };
   if (ease < -soft) return { k:'slight-tight', t:'略紧' };
@@ -2568,8 +2310,7 @@ function fitEase(ease, soft, hard){
 }
 function getRecommendedSize(cat){
   if (cat === 'cloth' || cat === 'coat' || cat === 'dress') {
-    const b = body.bust;
-    const idealBust = b + 8;
+    const b = body.bust, idealBust = b + 8;
     if (idealBust <= 82) return { size:'XS', bust:80 };
     if (idealBust <= 86) return { size:'S', bust:84 };
     if (idealBust <= 90) return { size:'M', bust:88 };
@@ -2578,13 +2319,8 @@ function getRecommendedSize(cat){
     return { size:'XXL', bust:100 };
   }
   if (cat === 'pants') {
-    const w = body.waist;
-    const idealWaist = w + 1.5;
-    const waistTable = [
-      { size:'24', w:61 }, { size:'25', w:63.5 }, { size:'26', w:66 },
-      { size:'27', w:68.5 }, { size:'28', w:71 }, { size:'29', w:73.5 },
-      { size:'30', w:76 }, { size:'31', w:78.5 }, { size:'32', w:81 }
-    ];
+    const w = body.waist, idealWaist = w + 1.5;
+    const waistTable = [{size:'24',w:61},{size:'25',w:63.5},{size:'26',w:66},{size:'27',w:68.5},{size:'28',w:71},{size:'29',w:73.5},{size:'30',w:76},{size:'31',w:78.5},{size:'32',w:81}];
     let best = waistTable[0], min = Infinity;
     waistTable.forEach(t => { const diff = Math.abs(t.w - idealWaist); if (diff < min) { min = diff; best = t; } });
     return { size:best.size, waist:best.w };
@@ -2632,9 +2368,7 @@ function getStyleAdvice(cat){
     if (sh === '沙漏型') advice.push('高腰直筒裤突显腰线。');
     if (sh === '矩形') advice.push('高腰 + 微喇裤营造曲线。');
   }
-  if (cat === 'shoes') {
-    advice.push('鞋头偏尖或偏圆可延伸腿线。');
-  }
+  if (cat === 'shoes') advice.push('鞋头偏尖或偏圆可延伸腿线。');
   return advice;
 }
 function analyzeFit(){
@@ -2653,7 +2387,7 @@ function analyzeFit(){
   if (meta.sizeType === 'pants') {
     if (g.waist) { const e = g.waist - body.waist; rows.push({ label:'腰围松量', value:`${e>0?'+':''}${e.toFixed(1)} cm`, fit:fitEase(e,2,5) }); }
     if (g.hip) { const e = g.hip - body.hip; rows.push({ label:'臀围松量', value:`${e>0?'+':''}${e.toFixed(1)} cm`, fit:fitEase(e,2.5,6) }); }
-    if (g.length) { const pl = analyzePantsLength(g); rows.push({ label:'裤长参考', value:`标称 ${g.length} cm（理想 ${pl.idealLength} cm）`, fit:{ k: pl.level === 'ok' ? 'ok' : (pl.level.includes('long') ? 'tight' : 'slight-loose'), t: pl.level === 'ok' ? '理想' : (pl.level.includes('long') ? '偏长' : '偏短') } }); if (pl.level !== 'ok') { alerts.push(pl.msg); } }
+    if (g.length) { const pl = analyzePantsLength(g); rows.push({ label:'裤长参考', value:`标称 ${g.length} cm（理想 ${pl.idealLength} cm）`, fit:{ k: pl.level === 'ok' ? 'ok' : (pl.level.includes('long') ? 'tight' : 'slight-loose'), t: pl.level === 'ok' ? '理想' : (pl.level.includes('long') ? '偏长' : '偏短') } }); if (pl.level !== 'ok') alerts.push(pl.msg); }
     if (rec) suggests.push(`基于腰围（${body.waist} cm），建议选中码 ${rec.size}。`);
   }
   if (meta.sizeType === 'shoes') {
@@ -2829,7 +2563,6 @@ function resetRotationUI(){
 }
 function commitBase(src){ imgState.base = src; resetRotationUI(); applyTransform(); }
 
-/* ===== 抠图 ===== */
 const bgState = { originalSrc: null };
 let bgDebounce = null;
 function scheduleBgPreview(){ clearTimeout(bgDebounce); bgDebounce = setTimeout(updateBgPreview, 130); }
@@ -2854,12 +2587,8 @@ function computeBgRemoved(src, tolerance, feather){
       const stepX = Math.max(1, Math.floor(W / 70));
       const stepY = Math.max(1, Math.floor(H / 70));
       const inset = 2;
-      for (let x = 0; x < W; x += stepX) {
-        [inset, H - 1 - inset].forEach(y => { const i = idx(x, Math.max(0, Math.min(H - 1, y))); colors.push([d[i], d[i + 1], d[i + 2]]); });
-      }
-      for (let y = 0; y < H; y += stepY) {
-        [inset, W - 1 - inset].forEach(x => { const i = idx(Math.max(0, Math.min(W - 1, x)), y); colors.push([d[i], d[i + 1], d[i + 2]]); });
-      }
+      for (let x = 0; x < W; x += stepX) [inset, H - 1 - inset].forEach(y => { const i = idx(x, Math.max(0, Math.min(H - 1, y))); colors.push([d[i], d[i + 1], d[i + 2]]); });
+      for (let y = 0; y < H; y += stepY) [inset, W - 1 - inset].forEach(x => { const i = idx(Math.max(0, Math.min(W - 1, x)), y); colors.push([d[i], d[i + 1], d[i + 2]]); });
       colors.sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
       const med = colors[Math.floor(colors.length / 2)] || [255, 255, 255];
       const br = med[0], bg = med[1], bb = med[2];
@@ -2867,12 +2596,7 @@ function computeBgRemoved(src, tolerance, feather){
       const visited = new Uint8Array(W * H);
       const isBg = new Uint8Array(W * H);
       const stack = [];
-      const push = (x, y) => {
-        if (x < 0 || y < 0 || x >= W || y >= H) return;
-        const p = y * W + x;
-        if (visited[p]) return;
-        visited[p] = 1; stack.push(p);
-      };
+      const push = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const p = y * W + x; if (visited[p]) return; visited[p] = 1; stack.push(p); };
       for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
       for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
       while (stack.length) {
@@ -2889,22 +2613,18 @@ function computeBgRemoved(src, tolerance, feather){
       const r = Math.max(0, Math.min(8, Math.round(feather)));
       if (r > 0) {
         const tmp = new Float32Array(W * H);
-        for (let y = 0; y < H; y++) {
-          for (let x = 0; x < W; x++) {
-            let sum = 0, cnt = 0;
-            for (let k = -r; k <= r; k++) { const xx = x + k; if (xx < 0 || xx >= W) continue; sum += alpha[y * W + xx]; cnt++; }
-            tmp[y * W + x] = sum / cnt;
-          }
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+          let sum = 0, cnt = 0;
+          for (let k = -r; k <= r; k++) { const xx = x + k; if (xx < 0 || xx >= W) continue; sum += alpha[y * W + xx]; cnt++; }
+          tmp[y * W + x] = sum / cnt;
         }
-        for (let y = 0; y < H; y++) {
-          for (let x = 0; x < W; x++) {
-            let sum = 0, cnt = 0;
-            for (let k = -r; k <= r; k++) { const yy = y + k; if (yy < 0 || yy >= H) continue; sum += tmp[yy * W + x]; cnt++; }
-            alpha[y * W + x] = sum / cnt;
-          }
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+          let sum = 0, cnt = 0;
+          for (let k = -r; k <= r; k++) { const yy = y + k; if (yy < 0 || yy >= H) continue; sum += tmp[yy * W + x]; cnt++; }
+          alpha[y * W + x] = sum / cnt;
         }
       }
-      for (let p = 0; p < W * H; p++) { d[p * 4 + 3] = Math.max(0, Math.min(255, Math.round(alpha[p]))); }
+      for (let p = 0; p < W * H; p++) d[p * 4 + 3] = Math.max(0, Math.min(255, Math.round(alpha[p])));
       ctx.putImageData(id, 0, 0);
       resolve(c.toDataURL('image/png'));
     };
@@ -2927,7 +2647,6 @@ async function applyBg(){
   commitBase(result); closeBgPanel();
 }
 
-/* ===== 裁剪 ===== */
 let cropState = {};
 function openCropPanel(){
   if (!imgState.src) return;
@@ -2995,11 +2714,11 @@ const profile = { ...profileDefault, ...Store.load('profile', {}) };
 const profileDraft = { ...profile };
 const PRODUCTS = {
   vc10:    { key:'vc10',    name:'John 10% 乙基维C',    ingredients:'3-O-乙基抗坏血酸、水、甘油、丙二醇', func:'抗氧化、改善暗沉' },
-  b5:      { key:'b5',      name:'理肤泉 B5 精华',      ingredients:'泛醇、积雪草苷、甘油',              func:'修复屏障' },
-  cerave:  { key:'cerave',  name:'适乐肤 C 霜',         ingredients:'神经酰胺、透明质酸、甘油、烟酰胺',   func:'修复屏障' },
-  aza:     { key:'aza',     name:'John 10% 壬二酸',     ingredients:'壬二酸、甘油、辛酸/癸酸甘油三酯',    func:'抗痘、抗炎' },
-  niacin7: { key:'niacin7', name:'John 7% 烟酰胺',      ingredients:'烟酰胺、水、甘油、戊二醇',          func:'控油、提亮' },
-  bpo:     { key:'bpo',     name:'BPO（过氧化苯甲酰）',  ingredients:'过氧化苯甲酰',                    func:'杀菌抗痘' }
+  b5:      { key:'b5',      name:'理肤泉 B5 精华',      ingredients:'泛醇、积雪草苷、甘油', func:'修复屏障' },
+  cerave:  { key:'cerave',  name:'适乐肤 C 霜',         ingredients:'神经酰胺、透明质酸、甘油、烟酰胺', func:'修复屏障' },
+  aza:     { key:'aza',     name:'John 10% 壬二酸',     ingredients:'壬二酸、甘油、辛酸/癸酸甘油三酯', func:'抗痘、抗炎' },
+  niacin7: { key:'niacin7', name:'John 7% 烟酰胺',      ingredients:'烟酰胺、水、甘油、戊二醇', func:'控油、提亮' },
+  bpo:     { key:'bpo',     name:'BPO（过氧化苯甲酰）', ingredients:'过氧化苯甲酰', func:'杀菌抗痘' }
 };
 function analyzeIngredients(name, ingrText, pKey){
   const reasons = []; let level = 'ok';
@@ -3010,15 +2729,12 @@ function analyzeIngredients(name, ingrText, pKey){
   if (/烟酰胺|niacinamide/i.test(origT)) { if (profile.sensitivity === '高') setLevel('caution', '含有烟酰胺，敏感肌可能刺痛，需建立耐受'); else reasons.push('含烟酰胺，有助于控油、提亮、修护屏障'); }
   if (/抗坏血酸|ascorbic|维c|乙基抗坏血酸/i.test(origT)) { if (profile.sensitivity === '高') setLevel('caution', '含有维C衍生物，敏感肌需逐步建立耐受'); else reasons.push('含维C成分，抗氧化、提亮肤色'); }
   if (/视黄醇|retinol|视黄醛|retinal|玻色因|pro-xylane|胜肽|peptide|多肽/i.test(origT)) { if (profile.sensitivity === '高') setLevel('caution', '含抗老活性成分，敏感肌需先建立耐受，建议夜间使用'); else reasons.push('含抗老成分，适合夜间护理'); }
-  if (/神经酰胺|ceramide|泛醇|panthenol|积雪草|centella|透明质酸|hyaluronic|角鲨烷|squalane|胆固醇/i.test(origT)) { reasons.push('含修复屏障成分，适合日常维持与敏感期'); }
+  if (/神经酰胺|ceramide|泛醇|panthenol|积雪草|centella|透明质酸|hyaluronic|角鲨烷|squalane|胆固醇/i.test(origT)) reasons.push('含修复屏障成分，适合日常维持与敏感期');
   if (/变性乙醇|酒精|alcohol\s*denat/i.test(origT)) { if (profile.sensitivity === '高') setLevel('caution', '含有变性乙醇，敏感肌慎用'); else if (profile.skinType === '干性') setLevel('caution', '含酒精成分，干皮使用可能加重干燥'); }
   if (level === 'ok' && reasons.length === 0) reasons.push('未检测到明显风险成分，可尝试使用');
   return { level, reasons, product:{ name, ingredients: ingrText, brand:'手动输入' } };
 }
-function getDayIndexForSkin(){
-  const d = new Date().getDay();
-  return d === 0 ? 7 : d;
-}
+function getDayIndexForSkin(){ const d = new Date().getDay(); return d === 0 ? 7 : d; }
 
 const STABLE_DAY_NOTES = [
   'AM 维C + B5 + C霜 + 防晒；PM 壬二酸 + C霜',
@@ -3035,158 +2751,54 @@ function buildStableA0Steps(){
   let morning = [], night = [];
   switch(day) {
     case 1:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'John 10% 乙基维C', group:'essence', defaultProduct:'vc10', note:'抗氧化、改善暗沉' },
-        { id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'舒缓修护' },
-        { id:'a0_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'修复屏障' },
-        { id:'a0_m5', name:'防晒', group:'sun', defaultProduct:null, note:'出门前20分钟' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'10% 壬二酸', group:'essence', defaultProduct:'aza', note:'抗痘抗炎，避开屏障薄弱处' },
-        { id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'修复屏障' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'John 10% 乙基维C', group:'essence', defaultProduct:'vc10', note:'抗氧化、改善暗沉' },{ id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'舒缓修护' },{ id:'a0_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'修复屏障' },{ id:'a0_m5', name:'防晒', group:'sun', defaultProduct:null, note:'出门前20分钟' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'10% 壬二酸', group:'essence', defaultProduct:'aza', note:'抗痘抗炎，避开屏障薄弱处' },{ id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'修复屏障' }];
       break;
     case 2:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'John 7% 烟酰胺', group:'essence', defaultProduct:'niacin7', note:'控油、提亮' },
-        { id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'舒缓' },
-        { id:'a0_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },
-        { id:'a0_m5', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'修护日：不加活性' },
-        { id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'John 7% 烟酰胺', group:'essence', defaultProduct:'niacin7', note:'控油、提亮' },{ id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'舒缓' },{ id:'a0_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },{ id:'a0_m5', name:'防晒', group:'sun', defaultProduct:null, note:'' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'修护日：不加活性' },{ id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }];
       break;
     case 3:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'10% 维C', group:'essence', defaultProduct:'vc10', note:'抗氧化' },
-        { id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-        { id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'10% 壬二酸', group:'essence', defaultProduct:'aza', note:'' },
-        { id:'a0_n3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-        { id:'a0_n4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'10% 维C', group:'essence', defaultProduct:'vc10', note:'抗氧化' },{ id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'10% 壬二酸', group:'essence', defaultProduct:'aza', note:'' },{ id:'a0_n3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'a0_n4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }];
       break;
     case 4:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'7% 烟酰胺', group:'essence', defaultProduct:'niacin7', note:'控油、提亮' },
-        { id:'a0_m3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },
-        { id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'修护日：不加活性' },
-        { id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'7% 烟酰胺', group:'essence', defaultProduct:'niacin7', note:'控油、提亮' },{ id:'a0_m3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },{ id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'修护日：不加活性' },{ id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }];
       break;
     case 5:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'10% 维C', group:'essence', defaultProduct:'vc10', note:'' },
-        { id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-        { id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'10% 壬二酸', group:'essence', defaultProduct:'aza', note:'' },
-        { id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'10% 维C', group:'essence', defaultProduct:'vc10', note:'' },{ id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'10% 壬二酸', group:'essence', defaultProduct:'aza', note:'' },{ id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }];
       break;
     case 6:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'7% 烟酰胺', group:'essence', defaultProduct:'niacin7', note:'' },
-        { id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-        { id:'a0_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },
-        { id:'a0_m5', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'修护日：不加活性' },
-        { id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'7% 烟酰胺', group:'essence', defaultProduct:'niacin7', note:'' },{ id:'a0_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'a0_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },{ id:'a0_m5', name:'防晒', group:'sun', defaultProduct:null, note:'' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'修护日：不加活性' },{ id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }];
       break;
     case 7:
     default:
-      morning = [
-        { id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_m2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'全天修护，不加活性' },
-        { id:'a0_m3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },
-        { id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-      ];
-      night = [
-        { id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-        { id:'a0_n2', name:'10% 壬二酸（视情况）', group:'essence', defaultProduct:'aza', note:'皮肤完全稳定用；刺痛/泛红则只用B5+C霜' },
-        { id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-      ];
+      morning = [{ id:'a0_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_m2', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'全天修护，不加活性' },{ id:'a0_m3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },{ id:'a0_m4', name:'防晒', group:'sun', defaultProduct:null, note:'' }];
+      night = [{ id:'a0_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a0_n2', name:'10% 壬二酸（视情况）', group:'essence', defaultProduct:'aza', note:'皮肤完全稳定用；刺痛/泛红则只用B5+C霜' },{ id:'a0_n3', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }];
       break;
   }
   return { morning, night };
 }
-
 function buildA1Steps(){
-  const morning = [
-    { id:'a1_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-    { id:'a1_m2', name:'烟酰胺 或 维C（二选一）', group:'essence', defaultProduct:null, note:'一天只保留一个主要活性' },
-    { id:'a1_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'舒缓' },
-    { id:'a1_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },
-    { id:'a1_m5', name:'防晒', group:'sun', defaultProduct:null, note:'' }
-  ];
-  const night = [
-    { id:'a1_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },
-    { id:'a1_n2', name:'10% 壬二酸（局部）', group:'essence', defaultProduct:'aza', note:'只涂痘痘区域；不要全脸' },
-    { id:'a1_n3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-    { id:'a1_n4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }
-  ];
-  return { morning, night };
+  return {
+    morning: [{ id:'a1_m1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a1_m2', name:'烟酰胺 或 维C（二选一）', group:'essence', defaultProduct:null, note:'一天只保留一个主要活性' },{ id:'a1_m3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'舒缓' },{ id:'a1_m4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' },{ id:'a1_m5', name:'防晒', group:'sun', defaultProduct:null, note:'' }],
+    night: [{ id:'a1_n1', name:'洁面', group:'clean', defaultProduct:null, note:'' },{ id:'a1_n2', name:'10% 壬二酸（局部）', group:'essence', defaultProduct:'aza', note:'只涂痘痘区域；不要全脸' },{ id:'a1_n3', name:'B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'a1_n4', name:'C 霜', group:'lotion', defaultProduct:'cerave', note:'' }]
+  };
 }
-
 function buildS2Steps(){
-  const morning = [
-    { id:'s2_m1', name:'清水 / 极温和清洁', group:'clean', defaultProduct:null, note:'能不用洗面奶就不用' },
-    { id:'s2_m2', name:'简单保湿 · B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-    { id:'s2_m3', name:'简单保湿霜', group:'lotion', defaultProduct:'cerave', note:'成分越简单越好' },
-    { id:'s2_m4', name:'防晒（物理优先）', group:'sun', defaultProduct:null, note:'必要时硬遮挡' }
-  ];
-  const night = [
-    { id:'s2_n1', name:'温和清洁', group:'clean', defaultProduct:null, note:'避免摩擦/去角质' },
-    { id:'s2_n2', name:'简单保湿 · B5 精华', group:'essence', defaultProduct:'b5', note:'' },
-    { id:'s2_n3', name:'简单保湿霜', group:'lotion', defaultProduct:'cerave', note:'' }
-  ];
-  return { morning, night };
+  return {
+    morning: [{ id:'s2_m1', name:'清水 / 极温和清洁', group:'clean', defaultProduct:null, note:'能不用洗面奶就不用' },{ id:'s2_m2', name:'简单保湿 · B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'s2_m3', name:'简单保湿霜', group:'lotion', defaultProduct:'cerave', note:'成分越简单越好' },{ id:'s2_m4', name:'防晒（物理优先）', group:'sun', defaultProduct:null, note:'必要时硬遮挡' }],
+    night: [{ id:'s2_n1', name:'温和清洁', group:'clean', defaultProduct:null, note:'避免摩擦/去角质' },{ id:'s2_n2', name:'简单保湿 · B5 精华', group:'essence', defaultProduct:'b5', note:'' },{ id:'s2_n3', name:'简单保湿霜', group:'lotion', defaultProduct:'cerave', note:'' }]
+  };
 }
-
 const SKIN_STATES = {
-  'stable': {
-    key:'stable', label:'稳定', icon:'🟢',
-    desc:'皮肤稳定，按 7 天周期轮换功效成分，避免每天无脑叠加。',
-    tips:'VC / 烟酰胺 / 壬二酸错开轮换。周日根据皮肤情况决定是否用壬二酸。',
-    getSteps: buildStableA0Steps
-  },
-  'acne': {
-    key:'acne', label:'部分位置长痘', icon:'🟡',
-    desc:'局部有红痘或小脓包，其他部位基本正常。',
-    tips:'只在痘痘处点涂壬二酸，其他部位照常修护。一天只保留一个主要活性。',
-    getSteps: buildA1Steps
-  },
-  'severe': {
-    key:'severe', label:'严重（皮炎/过敏/爆发）', icon:'🔴',
-    desc:'脂溢性皮炎明显爆发、过敏泛红刺痛、或大面积红肿痘。',
-    tips:'屏障修复模式：暂停维C、壬二酸、烟酰胺，只做洁面 + B5 + 保湿 + 防晒。严重请就医。',
-    getSteps: buildS2Steps
-  }
+  'stable': { key:'stable', label:'稳定', icon:'🟢', desc:'皮肤稳定，按 7 天周期轮换功效成分，避免每天无脑叠加。', tips:'VC / 烟酰胺 / 壬二酸错开轮换。周日根据皮肤情况决定是否用壬二酸。', getSteps: buildStableA0Steps },
+  'acne': { key:'acne', label:'部分位置长痘', icon:'🟡', desc:'局部有红痘或小脓包，其他部位基本正常。', tips:'只在痘痘处点涂壬二酸，其他部位照常修护。一天只保留一个主要活性。', getSteps: buildA1Steps },
+  'severe': { key:'severe', label:'严重（皮炎/过敏/爆发）', icon:'🔴', desc:'脂溢性皮炎明显爆发、过敏泛红刺痛、或大面积红肿痘。', tips:'屏障修复模式：暂停维C、壬二酸、烟酰胺，只做洁面 + B5 + 保湿 + 防晒。严重请就医。', getSteps: buildS2Steps }
 };
-
 function checkSkinStateDailyReset(){
   const today = todayStr();
   const lastDate = Store.load('skinStateDate', '');
@@ -3204,7 +2816,6 @@ function checkSkinStateDailyReset(){
     }, 600);
   }
 }
-
 function checkProductExpiry(prod){
   if (!prod || !prod.openedAt) return { expired:false, days:0, threshold:0, label:'' };
   const opened = new Date(prod.openedAt + 'T00:00:00');
@@ -3217,7 +2828,6 @@ function checkProductExpiry(prod){
   else if (/防晒/i.test(n)) threshold = 365;
   return { expired: days > threshold, days, threshold, label:`已开封 ${days} 天 / 建议 ${threshold} 天内用完` };
 }
-
 function getSkinProductForStep(stepId, defaultKey){
   if (state.skinProducts[stepId]) return state.skinProducts[stepId];
   if (defaultKey && PRODUCTS[defaultKey]) return { key: defaultKey, ...PRODUCTS[defaultKey] };
@@ -3246,11 +2856,9 @@ function applyProfileDraft(){
   btn.textContent = '✓ 已保存';
   setTimeout(() => { btn.textContent = oldText; }, 1200);
 }
-
 function renderSkin(){
   const s = SKIN_STATES[state.skinState] || SKIN_STATES['stable'];
   const steps = s.getSteps();
-
   const skinOptEl = $('#skinOptions');
   if (skinOptEl) {
     skinOptEl.innerHTML = Object.values(SKIN_STATES).map(v => `
@@ -3259,7 +2867,6 @@ function renderSkin(){
         <span class="oi-ck">${state.skinState === v.key ? '✓' : ''}</span>
       </div>`).join('');
   }
-
   let stateNote = '';
   if (s.key === 'stable') {
     const day = getDayIndexForSkin();
@@ -3271,7 +2878,6 @@ function renderSkin(){
   } else if (s.key === 'severe') {
     stateNote = `<div class="vis-item" style="border-bottom:none;padding-top:10px;background:#FFEDEA;border-radius:10px;padding:10px;margin-top:8px"><span class="ic">🛑</span><span><b>屏障修复模式</b>：暂停维C、壬二酸、烟酰胺，直到刺痛泛红明显下降。严重请就医。</span></div>`;
   }
-
   const descEl = $('#skinDescCard');
   if (descEl) {
     descEl.innerHTML = `
@@ -3280,7 +2886,6 @@ function renderSkin(){
       <div class="vis-item" style="border-bottom:none;padding-top:12px"><span class="ic">💡</span><span>${s.tips}</span></div>
       ${stateNote}`;
   }
-
   const renderSteps = (title, baseList, phase) => {
     const custom = (getCustomSkinSteps()[phase] || []);
     const list = sortSkinSteps([...baseList, ...custom]);
@@ -3293,20 +2898,9 @@ function renderSkin(){
         const r = analyzeIngredients(prod.name, prod.ingredients, prod.key);
         const tagText = r.level === 'ok' ? '适合' : r.level === 'caution' ? '谨慎' : '不建议';
         const tagCls = r.level === 'ok' ? 'ok' : r.level === 'caution' ? 'warn' : 'danger';
-        const expTag = exp.days > 0
-          ? `<span style="font-size:10px;color:${exp.expired?'#FF6B5B':'#8A90A2'};font-weight:500;flex:none">${exp.expired?'⚠️超期':'开封'+exp.days+'天'}</span>`
-          : '';
-        prodHtml = `<div class="step-product" data-pick-product="${it.id}">
-          <span>🧴</span>
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${prod.name}</span>
-          <span class="prod-tag ${tagCls}">${tagText}</span>
-          ${expTag}
-          <button class="ask-ai-btn" data-ask-ai="${it.id}" title="让 AI 分析">✨</button>
-          <span class="arrow">更换 ›</span>
-        </div>`;
-        if (exp.expired) {
-          prodHtml += `<div class="alert-box" style="margin-top:6px">⚠️ 这支产品${exp.label}。活性成分可能已氧化，建议更换。</div>`;
-        }
+        const expTag = exp.days > 0 ? `<span style="font-size:10px;color:${exp.expired?'#FF6B5B':'#8A90A2'};font-weight:500;flex:none">${exp.expired?'⚠️超期':'开封'+exp.days+'天'}</span>` : '';
+        prodHtml = `<div class="step-product" data-pick-product="${it.id}"><span>🧴</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${prod.name}</span><span class="prod-tag ${tagCls}">${tagText}</span>${expTag}<button class="ask-ai-btn" data-ask-ai="${it.id}" title="让 AI 分析">✨</button><span class="arrow">更换 ›</span></div>`;
+        if (exp.expired) prodHtml += `<div class="alert-box" style="margin-top:6px">⚠️ 这支产品${exp.label}。活性成分可能已氧化，建议更换。</div>`;
       } else {
         prodHtml = `<div class="step-product empty" data-pick-product="${it.id}">＋ 点击选择/输入产品</div>`;
       }
@@ -3323,7 +2917,6 @@ function renderSkin(){
     }).join('');
     return `<div class="card-title"><span>${title}</span><span style="display:flex;align-items:center;gap:10px"><span class="muted">${list.length} 步</span><button class="mini-add" data-add-skin-step="${phase}">＋ 添加步骤</button></span></div>${stepsHtml}`;
   };
-
   const mEl = $('#skinMorningCard');
   if (mEl) mEl.innerHTML = renderSteps('☀️ 早间流程', steps.morning, 'morning');
   const nEl = $('#skinNightCard');
@@ -3340,10 +2933,7 @@ function openProductSheet(stepId){
   $('#manualAnalysisResult').innerHTML = '';
   $('#prodSheet').classList.add('show'); $('#prodMask').classList.add('show');
 }
-function closeProductSheet(){
-  $('#prodSheet').classList.remove('show'); $('#prodMask').classList.remove('show');
-  state.pickingSkinStep = null;
-}
+function closeProductSheet(){ $('#prodSheet').classList.remove('show'); $('#prodMask').classList.remove('show'); state.pickingSkinStep = null; }
 function saveSkinProducts(){ saveRaw('skinProducts', state.skinProducts); }
 
 function saveSupplements(){ Store.save('supplements', state.supplements); }
@@ -3377,56 +2967,41 @@ function renderSportSession(){
   const timeRow = $('#sportTimeRow');
   const input = $('#sportStartTime');
   if (!tag || !info || !btns || !timeRow) return;
-
   if (input && !input.dataset.bound) {
     input.dataset.bound = '1';
     input.addEventListener('input', () => { input.dataset.userEdited = '1'; });
   }
-
   if (!sess) {
     tag.textContent = '未开始';
     tag.className = 'tag';
     timeRow.style.display = 'flex';
-    if (input && !input.dataset.userEdited) { input.value = fmtTime(new Date()); }
+    if (input && !input.dataset.userEdited) input.value = fmtTime(new Date());
     info.innerHTML = '<p class="tip" style="color:#8A90A2;margin-top:4px">设置开始时间后点击「开始打卡」，之后每完成一组会记录该组的时间。</p>';
     btns.innerHTML = '<button class="btn-primary" id="startSportBtn" style="margin-top:14px">▶ 开始打卡</button>';
     return;
   }
-
   input.value = sess.startLabel || fmtTime(new Date(sess.startTs));
   timeRow.style.display = 'flex';
-
   if (sess.endTs) {
     const total = sess.endTs - sess.startTs;
     tag.textContent = '已完成';
     tag.className = 'tag on';
     const setCount = Object.values(sess.sets || {}).reduce((a, b) => a + b.length, 0);
-    info.innerHTML =
-      '<div class="sport-timer" id="sportTimer">' + fmtDuration(total) + '</div>' +
+    info.innerHTML = '<div class="sport-timer" id="sportTimer">' + fmtDuration(total) + '</div>' +
       '<div class="sport-timer-sub">本次训练总时长</div>' +
-      '<div class="sport-meta">' +
-        '<span>开始 <b>' + (sess.startLabel || '—') + '</b></span>' +
-        '<span>结束 <b>' + fmtTime(new Date(sess.endTs)) + '</b></span>' +
-        '<span>完成组数 <b>' + setCount + '</b></span>' +
-      '</div>' +
+      '<div class="sport-meta"><span>开始 <b>' + (sess.startLabel || '—') + '</b></span><span>结束 <b>' + fmtTime(new Date(sess.endTs)) + '</b></span><span>完成组数 <b>' + setCount + '</b></span></div>' +
       '<div style="text-align:center"><span class="sport-done-badge">🎉 今日训练已完成</span></div>';
     btns.innerHTML = '<button class="btn-ghost" id="resetSportBtn" style="margin-top:14px">↺ 重置今日打卡</button>';
     return;
   }
-
   tag.textContent = '进行中';
   tag.className = 'tag on';
   const elapsed = Math.max(0, Date.now() - sess.startTs);
   const setCount = Object.values(sess.sets || {}).reduce((a, b) => a + b.length, 0);
-  info.innerHTML =
-    '<div class="sport-timer" id="sportTimer">' + fmtDuration(elapsed) + '</div>' +
+  info.innerHTML = '<div class="sport-timer" id="sportTimer">' + fmtDuration(elapsed) + '</div>' +
     '<div class="sport-timer-sub">已训练时长（从 ' + (sess.startLabel || '—') + ' 开始）</div>' +
-    '<div class="sport-meta">' +
-      '<span>已完成组数 <b id="sportSetCount">' + setCount + '</b></span>' +
-      '<span>开始于 <b>' + (sess.startLabel || '—') + '</b></span>' +
-    '</div>';
-  btns.innerHTML = '<button class="btn-ghost" id="endSportBtn" style="margin-top:14px">■ 结束打卡</button>' +
-                   '<button class="btn-ghost" id="resetSportBtn" style="margin-top:8px;background:#FFEDEA;color:#FF6B5B">↺ 重置今日打卡</button>';
+    '<div class="sport-meta"><span>已完成组数 <b id="sportSetCount">' + setCount + '</b></span><span>开始于 <b>' + (sess.startLabel || '—') + '</b></span></div>';
+  btns.innerHTML = '<button class="btn-ghost" id="endSportBtn" style="margin-top:14px">■ 结束打卡</button>' + '<button class="btn-ghost" id="resetSportBtn" style="margin-top:8px;background:#FFEDEA;color:#FF6B5B">↺ 重置今日打卡</button>';
 }
 function updateSportTimerText(){
   const sess = getSportSession();
@@ -3447,24 +3022,21 @@ function startSportSession(){
   saveSportSession({ startTs: d.getTime(), startLabel: `${pad(h)}:${pad(m)}`, endTs: null, sets: {} });
   const input = $('#sportStartTime');
   if (input) delete input.dataset.userEdited;
-  renderSportSession();
-  renderActual();
+  renderSportSession(); renderActual();
 }
 function endSportSession(){
   const sess = getSportSession();
   if (!sess) return;
   sess.endTs = Date.now();
   saveSportSession(sess);
-  renderSportSession();
-  renderActual();
+  renderSportSession(); renderActual();
 }
 function resetSportSession(){
   if (!confirm('确定要重置今天的打卡记录吗？')) return;
   saveSportSession(null);
   const input = $('#sportStartTime');
   if (input) { input.value = fmtTime(new Date()); delete input.dataset.userEdited; }
-  renderSportSession();
-  renderActual();
+  renderSportSession(); renderActual();
 }
 function recordSetTime(code){
   const sess = getSportSession();
@@ -3480,7 +3052,6 @@ function lastSetTimeOf(code){
   return fmtTime(new Date(sess.sets[code][sess.sets[code].length - 1]));
 }
 
-/* ===== 运动渲染 ===== */
 function renderSportAll(){
   const psi = $('#planStartInput');
   if (psi) psi.value = fmtDate(PLAN_START);
@@ -3544,9 +3115,7 @@ function renderPlanPreview(){
     const endTxt = sess.endTs ? fmtTime(new Date(sess.endTs)) : '进行中';
     html += `<div class="kv"><span class="k">今日打卡</span><span class="v hl">${sess.startLabel} → ${endTxt}</span></div>`;
   }
-  if (actual && actual.type === 'train' && actual.shifted) {
-    html += `<div class="kv"><span class="k">顺延提示</span><span class="v hl">↺ 因之前的请假 / 经期 / 替换，今日计划已顺延</span></div>`;
-  }
+  if (actual && actual.type === 'train' && actual.shifted) html += `<div class="kv"><span class="k">顺延提示</span><span class="v hl">↺ 因之前的请假 / 经期 / 替换，今日计划已顺延</span></div>`;
   html += `<div class="kv"><span class="k">注意</span><span class="v">${p.tips[0]}</span></div>`;
   $('#planPreview').innerHTML = html;
 }
@@ -3603,15 +3172,8 @@ function renderActual(){
     } else {
       const b = estimateBurn(p);
       const w = Number(body.weight) || 55;
-      burnEl.innerHTML = `
-        <div class="card-title">今日消耗 <span class="muted">MET × 体重估算</span></div>
-        <div class="row-between">
-          <div>
-            <div style="font-size:26px;font-weight:700">${b.kcal} <span style="font-size:13px;font-weight:500;color:#8A90A2">kcal</span></div>
-            <div class="muted">目标 ${b.target} kcal · 已完成 ${b.doneSets}/${b.totalSets} 组</div>
-          </div>
-          <span class="tag on">${b.pct}%</span>
-        </div>
+      burnEl.innerHTML = `<div class="card-title">今日消耗 <span class="muted">MET × 体重估算</span></div>
+        <div class="row-between"><div><div style="font-size:26px;font-weight:700">${b.kcal} <span style="font-size:13px;font-weight:500;color:#8A90A2">kcal</span></div><div class="muted">目标 ${b.target} kcal · 已完成 ${b.doneSets}/${b.totalSets} 组</div></div><span class="tag on">${b.pct}%</span></div>
         <div class="progress" style="margin-top:14px"><div class="bar" style="width:${b.pct}%"></div></div>
         <p class="tip" style="margin-top:10px;font-size:11.5px;color:#8A90A2">按每个动作的 MET 系数、你的体重（${w.toFixed(1)} kg）和预估每组耗时（1.5 分钟，含休息）估算。仅供参考。</p>`;
     }
@@ -3647,11 +3209,7 @@ function exCardHTML(ex){
   const dots = Array.from({length: ex.sets}, (_, i) => `<i class="${i < done ? 'on' : ''}"></i>`).join('');
   const lt = lastSetTimeOf(ex.code);
   return `<div class="ex-item ${finished ? 'finished' : ''}" id="ex-${ex.code}">
-    <div class="ex-top">
-      <span class="code">${ex.code}</span>
-      <div class="body"><div class="t-name">${ex.name}</div><div class="sets">${ex.sets} 组 × ${ex.reps} · ${ex.load}</div></div>
-      ${finished ? '<span class="tag on ex-done-tag">已完成</span>' : ''}
-    </div>
+    <div class="ex-top"><span class="code">${ex.code}</span><div class="body"><div class="t-name">${ex.name}</div><div class="sets">${ex.sets} 组 × ${ex.reps} · ${ex.load}</div></div>${finished ? '<span class="tag on ex-done-tag">已完成</span>' : ''}</div>
     <div class="ex-detail">
       <div style="margin-bottom:5px"><b>🎯 主要部位：</b>${ex.purpose || '—'}</div>
       <div style="margin-bottom:5px"><b>📍 起始姿势：</b>${ex.start || '—'}</div>
@@ -3661,18 +3219,8 @@ function exCardHTML(ex){
       <div style="margin-bottom:5px"><b>✅ 感觉：</b>${ex.feel || '—'}</div>
       ${ex.note ? `<div style="color:var(--accent)"><b>💡 提示：</b>${ex.note}</div>` : ''}
     </div>
-    <div class="ex-bottom">
-      <div class="sets-dots">${dots}</div>
-      <span class="sets-count">${done}/${ex.sets} 组${lt ? `<span class="set-time">最近 ${lt}</span>` : ''}</span>
-      <button class="cnt-btn" data-code="${ex.code}" ${finished ? 'disabled' : ''}>${finished ? '✓ 完成' : '＋ 完成一组'}</button>
-    </div>
-    <div class="rest-inline">
-      <span class="rest-lb">组间休息</span>
-      <span class="rest-num-sm" id="rest-${ex.code}">--</span>
-      <button class="rest-btn-sm" data-rest="${ex.code}" data-sec="45">45s</button>
-      <button class="rest-btn-sm" data-rest="${ex.code}" data-sec="60">60s</button>
-      <button class="rest-btn-sm" data-rest="${ex.code}" data-sec="90">90s</button>
-    </div>
+    <div class="ex-bottom"><div class="sets-dots">${dots}</div><span class="sets-count">${done}/${ex.sets} 组${lt ? `<span class="set-time">最近 ${lt}</span>` : ''}</span><button class="cnt-btn" data-code="${ex.code}" ${finished ? 'disabled' : ''}>${finished ? '✓ 完成' : '＋ 完成一组'}</button></div>
+    <div class="rest-inline"><span class="rest-lb">组间休息</span><span class="rest-num-sm" id="rest-${ex.code}">--</span><button class="rest-btn-sm" data-rest="${ex.code}" data-sec="45">45s</button><button class="rest-btn-sm" data-rest="${ex.code}" data-sec="60">60s</button><button class="rest-btn-sm" data-rest="${ex.code}" data-sec="90">90s</button></div>
   </div>`;
 }
 function updateExCard(ex){
@@ -3690,11 +3238,8 @@ function updateExCard(ex){
   const btn = el.querySelector('.cnt-btn');
   if (btn) { btn.disabled = finished; btn.textContent = finished ? '✓ 完成' : '＋ 完成一组'; }
   let tag = el.querySelector('.ex-done-tag');
-  if (finished && !tag) {
-    tag = document.createElement('span');
-    tag.className = 'tag on ex-done-tag'; tag.textContent = '已完成';
-    el.querySelector('.ex-top').appendChild(tag);
-  } else if (!finished && tag) tag.remove();
+  if (finished && !tag) { tag = document.createElement('span'); tag.className = 'tag on ex-done-tag'; tag.textContent = '已完成'; el.querySelector('.ex-top').appendChild(tag); }
+  else if (!finished && tag) tag.remove();
 }
 function renderFormal(){
   Object.values(state.restTimers).forEach(t => clearInterval(t));
@@ -3726,22 +3271,9 @@ function renderFormal(){
     </div>`;
   };
   let html = '';
-  if (p.warmup.length) {
-    html += `<div class="card">
-      <div class="card-title">🔥 热身 <span class="muted">${p.warmup.length} 个动作 · 8–10 分钟</span></div>
-      ${p.warmup.map(w => warmExHTML(w, 'warm')).join('')}
-    </div>`;
-  }
-  html += `<div class="card">
-    <div class="card-title">🏋️ 主训练 <span class="muted">${p.exercises.length} 个动作</span></div>
-    ${p.exercises.map(exCardHTML).join('')}
-  </div>`;
-  if (p.stretch.length) {
-    html += `<div class="card">
-      <div class="card-title">🧘 训练后拉伸 <span class="muted">${p.stretch.length} 个动作 · 约 5 分钟</span></div>
-      ${p.stretch.map(s => warmExHTML(s, 'stretch')).join('')}
-    </div>`;
-  }
+  if (p.warmup.length) html += `<div class="card"><div class="card-title">🔥 热身 <span class="muted">${p.warmup.length} 个动作 · 8–10 分钟</span></div>${p.warmup.map(w => warmExHTML(w, 'warm')).join('')}</div>`;
+  html += `<div class="card"><div class="card-title">🏋️ 主训练 <span class="muted">${p.exercises.length} 个动作</span></div>${p.exercises.map(exCardHTML).join('')}</div>`;
+  if (p.stretch.length) html += `<div class="card"><div class="card-title">🧘 训练后拉伸 <span class="muted">${p.stretch.length} 个动作 · 约 5 分钟</span></div>${p.stretch.map(s => warmExHTML(s, 'stretch')).join('')}</div>`;
   html += `<div class="card" style="background:var(--accent-soft)"><div class="card-title">⚠️ 注意事项</div><p class="tip">${p.tips.join('<br>')}</p></div>`;
   el.innerHTML = html;
   applyChecks();
@@ -3770,15 +3302,13 @@ function renderHistorySummary(){
   const hist = getBodyHistory().slice(-7);
   let weightHtml = '<p class="tip" style="color:#8A90A2">暂无体重记录</p>';
   if (hist.length) {
-    weightHtml = '<div style="display:flex;flex-direction:column;gap:4px">' +
-      hist.map((h, i) => {
-        const prev = i > 0 ? hist[i - 1] : null;
-        const dw = prev ? h.weight - prev.weight : 0;
-        const arrow = prev ? (dw > 0.05 ? `<span style="color:#FF6B5B;font-size:11px"> ↑${dw.toFixed(1)}</span>` : dw < -0.05 ? `<span style="color:#1FBFA9;font-size:11px"> ↓${Math.abs(dw).toFixed(1)}</span>` : '') : '';
-        return `<div class="kv" style="border-bottom:none;padding:3px 0"><span class="k" style="width:78px;font-size:11.5px">${h.date.slice(5)}</span><span class="v" style="font-size:12.5px">${h.weight.toFixed(1)} kg · ${h.bodyFat.toFixed(1)}%${arrow}</span></div>`;
-      }).join('') + '</div>';
+    weightHtml = '<div style="display:flex;flex-direction:column;gap:4px">' + hist.map((h, i) => {
+      const prev = i > 0 ? hist[i - 1] : null;
+      const dw = prev ? h.weight - prev.weight : 0;
+      const arrow = prev ? (dw > 0.05 ? `<span style="color:#FF6B5B;font-size:11px"> ↑${dw.toFixed(1)}</span>` : dw < -0.05 ? `<span style="color:#1FBFA9;font-size:11px"> ↓${Math.abs(dw).toFixed(1)}</span>` : '') : '';
+      return `<div class="kv" style="border-bottom:none;padding:3px 0"><span class="k" style="width:78px;font-size:11.5px">${h.date.slice(5)}</span><span class="v" style="font-size:12.5px">${h.weight.toFixed(1)} kg · ${h.bodyFat.toFixed(1)}%${arrow}</span></div>`;
+    }).join('') + '</div>';
   }
-
   const sessions = getSportSessions();
   const now = new Date();
   let sportCount = 0, sportMinutes = 0;
@@ -3787,21 +3317,16 @@ function renderHistorySummary(){
     const s = sessions[fmtDate(d)];
     if (s && s.endTs) { sportCount++; sportMinutes += Math.round((s.endTs - s.startTs) / 60000); }
   }
-
   const checks = getChecks();
   let skinDone = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date(now); d.setDate(d.getDate() - i);
     const k = fmtDate(d);
-    Object.keys(checks).forEach(key => {
-      if (key.indexOf('skin_' + k + '_') === 0 && checks[key]) skinDone++;
-    });
+    Object.keys(checks).forEach(key => { if (key.indexOf('skin_' + k + '_') === 0 && checks[key]) skinDone++; });
   }
-
   const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   const cutStr = fmtDate(sevenDaysAgo);
   const txCount = state.transactions.filter(t => t.date >= cutStr).length;
-
   el.innerHTML = `
     <div class="kv"><span class="k">体重记录</span><span class="v" style="font-size:11.5px;color:#8A90A2">近 7 天共 ${hist.length} 条</span></div>
     <div style="padding:4px 0 8px">${weightHtml}</div>
@@ -3831,23 +3356,15 @@ function playBeep(){
 let centerTimerEndTs = 0;
 let centerTimerHandle = null;
 let centerTimerActive = false;
-
 function speakText(text){
   const t = String(text || '');
   if (!t) return;
-  try {
-    if (window.AndroidBridge && typeof AndroidBridge.speak === 'function') {
-      AndroidBridge.speak(t);
-      return;
-    }
-  } catch(e){}
+  try { if (window.AndroidBridge && typeof AndroidBridge.speak === 'function') { AndroidBridge.speak(t); return; } } catch(e){}
   try {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(t);
-      u.lang = 'zh-CN';
-      u.rate = 1.0;
-      u.pitch = 1.0;
+      u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.0;
       window.speechSynthesis.speak(u);
     }
   } catch(e){}
@@ -3892,9 +3409,7 @@ function showCenterTimer(sec){
   vibratePattern([150]);
 }
 window.showCenterTimer = showCenterTimer;
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && centerTimerActive) tickCenterTimer();
-});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && centerTimerActive) tickCenterTimer(); });
 
 /* ===== 设置 ===== */
 function renderSettingsBody(){
@@ -3903,13 +3418,7 @@ function renderSettingsBody(){
       ${g.fields.map(f => `<div class="set-row"><span class="lb">${f.label}</span><input type="number" step="${f.step}" id="in-${f.key}" value="${body[f.key] ?? ''}"><span class="unit">${f.unit}</span></div>`).join('')}
     </div>`).join('');
 }
-function openSettings(){
-  if (isSuppressed()) return;
-  closeAllSheets();
-  renderSettingsBody();
-  $('#settingsMask').classList.add('show');
-  $('#settingsSheet').classList.add('show');
-}
+function openSettings(){ if (isSuppressed()) return; closeAllSheets(); renderSettingsBody(); $('#settingsMask').classList.add('show'); $('#settingsSheet').classList.add('show'); }
 function closeSettings(){ $('#settingsMask').classList.remove('show'); $('#settingsSheet').classList.remove('show'); }
 function saveSettings(){
   BODY_FIELDS.forEach(k => { const input = document.getElementById('in-' + k); if (!input) return; const v = parseFloat(input.value); if (!isNaN(v)) body[k] = v; });
@@ -3918,7 +3427,6 @@ function saveSettings(){
   closeSettings(); renderCloset(); renderSportBodyStats(); renderSkin(); renderHistorySummary(); renderHomeDate();
 }
 
-/* ===== 全局持久化 flush ===== */
 function flushAll(){
   try {
     __nativeSetItem('dailyChecks', JSON.stringify(getChecks()));
@@ -3932,27 +3440,18 @@ function flushAll(){
     Store.save('selectedDate', state.selectedDate);
     Store.save('calYear', state.calYear);
     Store.save('calMonth', state.calMonth);
-    saveTransactions();
-    saveClothes();
-    saveSkinProducts();
+    saveTransactions(); saveClothes(); saveSkinProducts();
   } catch(e){}
 }
 window.addEventListener('beforeunload', flushAll);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAll(); });
 
-/* ===== 面板 / 误触管理 ===== */
 let suppressClickUntil = 0;
 function suppressClicks(ms){ suppressClickUntil = Date.now() + (ms || 600); }
 function isSuppressed(){ return Date.now() < suppressClickUntil; }
 function closeAllSheets(){
-  ['settingsSheet','todoSheet','pickSheet','prodSheet'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('show');
-  });
-  ['settingsMask','todoMask','pickMask','prodMask'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('show');
-  });
+  ['settingsSheet','todoSheet','pickSheet','prodSheet'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
+  ['settingsMask','todoMask','pickMask','prodMask'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('show'); });
   state.pickingSkinStep = null;
 }
 
@@ -3965,48 +3464,32 @@ function renderHomeDate(){
   if (el2 && !el2.textContent.trim()) el2.textContent = '☀️ 晴';
   const el3 = document.getElementById('homeTemp');
   if (el3 && (!el3.textContent.trim() || el3.textContent.trim() === '--℃')) el3.textContent = '--℃';
-
   const s = document.getElementById('lifeSuggest');
   if (s) {
     try {
       const p = currentPlan();
-      const sportTip = p.isTraining
-        ? `今天「${p.label}」，注意补水、蛋白与睡眠`
-        : `今天是「${p.label}」，充分休息别熬夜`;
+      const sportTip = p.isTraining ? `今天「${p.label}」，注意补水、蛋白与睡眠` : `今天是「${p.label}」，充分休息别熬夜`;
       s.innerHTML = `生活建议：${sportTip}`;
-    } catch(e){
-      s.innerHTML = `生活建议：保持规律作息，多喝水`;
-    }
+    } catch(e){ s.innerHTML = `生活建议：保持规律作息，多喝水`; }
   }
 }
 
-/* ===== 首页时间线（打卡模式） ===== */
+/* ★ 首页时间线打卡模式 */
 function renderHomeTimeline(){
   const wrap = document.getElementById('homeTlWrap');
   if (!wrap) return;
-
   const t = todayStr();
   const checks = getChecks();
   const manualTodos = ((state.calendarData[t] || []).filter(x => x.manual)).slice();
   manualTodos.sort((a,b) => (a.time||'').localeCompare(b.time||''));
-
   const ov = getOverride(new Date());
-  const ovMap = {
-    swim: '游泳',
-    reduced: '减量训练',
-    period: '经期休息',
-    leave: '请假',
-    rest: '休息'
-  };
+  const ovMap = { swim:'游泳', reduced:'减量训练', period:'经期休息', leave:'请假', rest:'休息' };
   let sportText = '运动';
   if (ov && ovMap[ov]) sportText = ovMap[ov];
-  else {
-    try { sportText = currentPlan().label; } catch(e){ sportText = '运动'; }
-  }
+  else { try { sportText = currentPlan().label; } catch(e){ sportText = '运动'; } }
   let isTrainingDay = false;
   try { isTrainingDay = currentPlan().isTraining; } catch(e){ isTrainingDay = false; }
 
-  // 每个条目带一个唯一 checkKey，用于保存勾选状态
   const items = [
     { time:'07:00', text:'起床 - 晨间 90/90 呼吸', checkKey: `home_${t}_wake` },
     { time:'07:40', text:'护肤', sub:'早间护肤', action:'skin-morning', badge:'早间', checkKey: `home_${t}_skin_am` },
@@ -4019,9 +3502,7 @@ function renderHomeTimeline(){
   items.push({ time:'17:00', text:'晚饭（记得吃补剂）', sub:'米饭 + 鱼/鸡肉 + 蔬菜（避免油腻）', action:'supplement', checkKey: `home_${t}_dinner` });
   if (manualTodos[2]) items.push({ time: manualTodos[2].time || '', text: manualTodos[2].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo3` });
   items.push({ time:'19:30', text: sportText, action:'sport', badge:'今日运动', checkKey: `home_${t}_sport` });
-  if (isTrainingDay) {
-    items.push({ time:'21:00', text:'蛋白质（运动的时候就补）', sub:'若饿或蛋白不足，补充 20–30g 蛋白质', action:'sport', checkKey: `home_${t}_protein` });
-  }
+  if (isTrainingDay) items.push({ time:'21:00', text:'蛋白质（运动的时候就补）', sub:'若饿或蛋白不足，补充 20–30g 蛋白质', action:'sport', checkKey: `home_${t}_protein` });
   items.push({ time:'22:00', text:'洗漱（护肤）', sub:'晚间护理', action:'skin-night', badge:'晚间', checkKey: `home_${t}_skin_pm` });
   items.push({ time:'22:30', text:'睡前 90/90 呼吸', checkKey: `home_${t}_breathe` });
 
@@ -4030,12 +3511,9 @@ function renderHomeTimeline(){
     const cls = ['home-tl-item'];
     if (done) cls.push('is-done');
     const actionAttr = it.action ? `data-home-action="${it.action}"` : '';
-    const badge = it.badge
-      ? `<span class="home-tl-badge">${it.badge}</span>`
-      : (it.isTodo ? `<span class="home-tl-badge todo">代办</span>` : '');
+    const badge = it.badge ? `<span class="home-tl-badge">${it.badge}</span>` : (it.isTodo ? `<span class="home-tl-badge todo">代办</span>` : '');
     const arrow = it.action ? `<span class="home-tl-arrow">›</span>` : '';
     const sub = it.sub ? `<span class="sub">${it.sub}</span>` : '';
-    // 打卡圆圈：使用 .check 类，配合 data-check-key，点击即可勾选/取消
     const checkHtml = `<span class="check ${done ? 'done' : ''}" data-check-key="${it.checkKey}"></span>`;
     return `<div class="${cls.join(' ')}" ${actionAttr}>
       ${checkHtml}
@@ -4043,8 +3521,6 @@ function renderHomeTimeline(){
       ${badge}${arrow}
     </div>`;
   }).join('');
-
-  // 保证所有圆圈状态是最新的
   applyChecks();
 }
 
@@ -4052,20 +3528,15 @@ function switchTab(target){
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.target === target));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === target));
   const page = document.getElementById(target);
-  if (page) {
-    const sc = page.querySelector('.scroll');
-    if (sc) sc.scrollTop = 0;
-  }
+  if (page) { const sc = page.querySelector('.scroll'); if (sc) sc.scrollTop = 0; }
   if (target === 'p-home') { renderHomeDate(); renderHomeTimeline(); renderSportAll(); }
   if (target === 'p-cal') { renderAllTodo(); renderUndone(); }
   if (target === 'p-sport') { renderSportSession(); renderHistorySummary(); }
   if (target === 'p-care') { renderSkin(); }
 }
-
 function jumpFromHome(action){
   closeAllSheets();
   suppressClicks(900);
-
   const goCareSubTab = (label, cardId) => {
     switchTab('p-care');
     setTimeout(() => {
@@ -4085,38 +3556,29 @@ function jumpFromHome(action){
             const eRect = el.getBoundingClientRect();
             const sRect = scroller.getBoundingClientRect();
             scroller.scrollTop += (eRect.top - sRect.top) - Math.max(0, (sRect.height - eRect.height) / 2 - 20);
-          } else {
-            try { el.scrollIntoView({ block:'center' }); } catch(e){}
-          }
+          } else { try { el.scrollIntoView({ block:'center' }); } catch(e){} }
           el.classList.add('pulse');
           setTimeout(() => el.classList.remove('pulse'), 1800);
         }, 200);
       }
     }, 320);
   };
-
   if (action === 'skin-morning') return goCareSubTab('护肤', 'skinMorningCard');
-  if (action === 'skin-night')   return goCareSubTab('护肤', 'skinNightCard');
-  if (action === 'supplement')   return goCareSubTab('补剂', null);
+  if (action === 'skin-night') return goCareSubTab('护肤', 'skinNightCard');
+  if (action === 'supplement') return goCareSubTab('补剂', null);
   if (action === 'todo'){ switchTab('p-cal'); return; }
   if (action === 'sport'){ switchTab('p-sport'); return; }
 }
-
-/* 首页时间线点击：如果点击的是勾选圆圈，跳过跳转逻辑，交给 .check 处理器 */
 document.addEventListener('click', e => {
-  if (e.target.closest('.check')) return;   // 勾选圆圈：走冒泡阶段的 check 处理
+  if (e.target.closest('.check')) return;
   const tl = e.target.closest('[data-home-action]');
   if (!tl) return;
-  e.preventDefault();
-  e.stopPropagation();
+  e.preventDefault(); e.stopPropagation();
   if (isSuppressed()) return;
   jumpFromHome(tl.dataset.homeAction);
 }, true);
 
-/* ===== 事件绑定 ===== */
-$$('.tab').forEach(tab => {
-  tab.addEventListener('click', () => { switchTab(tab.dataset.target); });
-});
+$$('.tab').forEach(tab => { tab.addEventListener('click', () => { switchTab(tab.dataset.target); }); });
 $$('.subnav').forEach(nav => {
   nav.addEventListener('click', e => {
     const btn = e.target.closest('.sub-item');
@@ -4162,12 +3624,8 @@ document.addEventListener('click', e => {
   }
   if (e.target.closest('#backToTodayBtn')) {
     const now = new Date();
-    state.calYear = now.getFullYear();
-    state.calMonth = now.getMonth();
-    state.selectedDate = todayStr();
-    Store.save('calYear', state.calYear);
-    Store.save('calMonth', state.calMonth);
-    Store.save('selectedDate', state.selectedDate);
+    state.calYear = now.getFullYear(); state.calMonth = now.getMonth(); state.selectedDate = todayStr();
+    Store.save('calYear', state.calYear); Store.save('calMonth', state.calMonth); Store.save('selectedDate', state.selectedDate);
     renderCalendar();
     return;
   }
@@ -4185,8 +3643,7 @@ document.addEventListener('click', e => {
     const custom = getCustomSkinSteps();
     if (!custom[phase]) custom[phase] = [];
     custom[phase].push({ id: 'c_' + phase + '_' + Date.now(), name, group, note, defaultProduct: null, custom: true });
-    saveCustomSkinSteps(custom);
-    renderSkin();
+    saveCustomSkinSteps(custom); renderSkin();
     return;
   }
   const delSkinStepBtn = e.target.closest('[data-del-skin-step]');
@@ -4235,7 +3692,6 @@ document.addEventListener('click', e => {
   if (e.target.closest('#saveTodoBtn')) { saveTodo(); return; }
   if (e.target.closest('#closePick') || e.target.closest('#pickMask')) { closePickSheet(); return; }
   if (e.target.closest('#closeProd') || e.target.closest('#prodMask')) { closeProductSheet(); return; }
-
   const askAiBtn = e.target.closest('[data-ask-ai]');
   if (askAiBtn) {
     e.stopPropagation();
@@ -4259,7 +3715,6 @@ document.addEventListener('click', e => {
     }
     return;
   }
-
   if (e.target.closest('#analyzeManualBtn')) {
     const name = $('#prodManualName').value.trim();
     const ingr = $('#prodManualIngr').value.trim();
@@ -4315,13 +3770,16 @@ document.addEventListener('click', e => {
   }
   if (e.target.closest('#cancelTxBtn')) {
     state.pendingTx = null; $('#txEdit').classList.remove('show'); $('#asrChips').innerHTML = ''; $('#asrTag').textContent = '已取消';
-    document.querySelectorAll('.tx.editing').forEach(el => el.classList.remove('editing')); return;
+    document.querySelectorAll('.tx.editing').forEach(el => el.classList.remove('editing'));
+    return;
   }
   const delTx = e.target.closest('[data-del-tx]');
   if (delTx) {
     const delId = Number(delTx.dataset.delTx);
     if (state.pendingTx && state.pendingTx.editingId === delId) { state.pendingTx = null; $('#txEdit').classList.remove('show'); $('#asrChips').innerHTML = ''; $('#asrTag').textContent = '已取消'; }
-    state.transactions = state.transactions.filter(t => t.id !== delId); saveTransactions(); renderMoney(); return;
+    state.transactions = state.transactions.filter(t => t.id !== delId);
+    saveTransactions(); renderMoney();
+    return;
   }
   const txItem = e.target.closest('.tx[data-tx-id]');
   if (txItem) { editTransaction(txItem.dataset.txId); return; }
@@ -4332,13 +3790,11 @@ document.addEventListener('click', e => {
     const delItem = state.clothes.find(c => c.id === delId);
     if (delItem && delItem.imageId) {
       try { imageDB.remove(delItem.imageId); } catch(e){}
-      if (imageCache[delItem.imageId]) {
-        try { URL.revokeObjectURL(imageCache[delItem.imageId]); } catch(e){}
-        delete imageCache[delItem.imageId];
-      }
+      if (imageCache[delItem.imageId]) { try { URL.revokeObjectURL(imageCache[delItem.imageId]); } catch(e){} delete imageCache[delItem.imageId]; }
     }
     state.clothes = state.clothes.filter(c => c.id !== delId);
-    saveClothes(); renderLibrary(); renderFreeSlots(); renderFreeOptions(); renderAIMatch(); return;
+    saveClothes(); renderLibrary(); renderFreeSlots(); renderFreeOptions(); renderAIMatch();
+    return;
   }
   const delSupp = e.target.closest('[data-del-supp]');
   if (delSupp) { state.supplements = state.supplements.filter(s => s.id !== Number(delSupp.dataset.delSupp)); saveSupplements(); renderSupplements(); return; }
@@ -4362,7 +3818,8 @@ document.addEventListener('click', e => {
     else { imgState.rotation = ((imgState.rotation + Number(act)) % 360 + 360) % 360; if (imgState.rotation > 180) imgState.rotation -= 360; }
     $('#rotateSlider').value = Math.max(-180, Math.min(180, imgState.rotation));
     $('#rotateVal').textContent = Math.round(imgState.rotation) + '°';
-    applyTransform(); return;
+    applyTransform();
+    return;
   }
   const dayEl = e.target.closest('[data-date]');
   if (dayEl) { state.selectedDate = dayEl.dataset.date; Store.save('selectedDate', state.selectedDate); renderCalendar(); return; }
@@ -4373,10 +3830,9 @@ document.addEventListener('click', e => {
     const mode = opt.dataset.mode;
     const today = new Date(); today.setHours(0,0,0,0);
     if (mode === 'original') setOverride(today, null); else setOverride(today, mode);
-    buildCalendarFromPlans(); renderSportAll(); renderCalendar(); renderAllTodo(); renderUndone(); renderHomeTimeline(); return;
+    buildCalendarFromPlans(); renderSportAll(); renderCalendar(); renderAllTodo(); renderUndone(); renderHomeTimeline();
+    return;
   }
-
-  /* 勾选圆圈：切换 done 状态并保存 */
   const c = e.target.closest('.check');
   if (c && !c.closest('[data-toggle-todo]')) {
     c.classList.toggle('done');
@@ -4384,12 +3840,10 @@ document.addEventListener('click', e => {
     if (c.dataset.checkKey) setCheck(c.dataset.checkKey, isDone);
     const supp = c.closest('.supp');
     if (supp) supp.classList.toggle('taken', isDone);
-    // 首页时间线：同步更新 is-done，用于文字变灰/删除线
     const homeItem = c.closest('.home-tl-item');
     if (homeItem) homeItem.classList.toggle('is-done', isDone);
     return;
   }
-
   const cntBtn = e.target.closest('.cnt-btn');
   if (cntBtn && !cntBtn.disabled) {
     const code = cntBtn.dataset.code;
@@ -4403,8 +3857,7 @@ document.addEventListener('click', e => {
       Store.save('setsDone', state.setsDone);
       recordSetTime(code);
       updateExCard(ex);
-      renderSportSession();
-      renderActual();
+      renderSportSession(); renderActual();
     }
     return;
   }
@@ -4422,7 +3875,8 @@ document.addEventListener('click', e => {
     const meta = CATEGORIES[closet.cat];
     if (meta.sizeType === 'free') { closet.uniform = true; closet.sizeLabel = ''; }
     else { closet.uniform = false; closet.sizeLabel = meta.def; }
-    renderCatGrid(); renderSizeSection(); renderGarmentFields(); renderFit(); return;
+    renderCatGrid(); renderSizeSection(); renderGarmentFields(); renderFit();
+    return;
   }
   const uniBtn = e.target.closest('#uniformToggle');
   if (uniBtn && !uniBtn.disabled) { closet.uniform = !closet.uniform; if (closet.uniform) closet.sizeLabel = ''; renderSizeSection(); renderFit(); return; }
@@ -4466,17 +3920,20 @@ document.addEventListener('click', e => {
     let slot = 2;
     if (['coat','top','dress'].includes(item.cat)) slot = 0;
     else if (item.cat === 'pants') slot = 1;
-    state.freeSlots[slot] = item; Store.save('freeSlots', state.freeSlots); renderFreeSlots(); return;
+    state.freeSlots[slot] = item; Store.save('freeSlots', state.freeSlots); renderFreeSlots();
+    return;
   }
   const pickItem = e.target.closest('[data-pick-item]');
   if (pickItem) {
     const item = state.clothes.find(c => c.id === Number(pickItem.dataset.pickItem));
     if (item) state.freeSlots[Number(pickItem.dataset.pickSlot)] = item;
-    Store.save('freeSlots', state.freeSlots); closePickSheet(); renderFreeSlots(); return;
+    Store.save('freeSlots', state.freeSlots); closePickSheet(); renderFreeSlots();
+    return;
   }
   if (e.target.closest('#saveFreeBtn')) {
     if (!state.freeSlots.some(Boolean)) { alert('还没有选择任何单品'); return; }
-    alert('搭配已保存！'); return;
+    alert('搭配已保存！');
+    return;
   }
 });
 
@@ -4510,16 +3967,8 @@ document.addEventListener('input', e => {
     renderAllTodo(); renderUndone();
     return;
   }
-  if (e.target.id === 'searchTx') {
-    state.search.tx = e.target.value.trim();
-    renderMoney();
-    return;
-  }
-  if (e.target.id === 'searchClothes') {
-    state.search.clothes = e.target.value.trim();
-    renderLibrary();
-    return;
-  }
+  if (e.target.id === 'searchTx') { state.search.tx = e.target.value.trim(); renderMoney(); return; }
+  if (e.target.id === 'searchClothes') { state.search.clothes = e.target.value.trim(); renderLibrary(); return; }
   const id = e.target.id;
   if (id === 'sizeInput') { closet.sizeLabel = e.target.value; renderSizeSection(); renderFit(); }
   if (id === 'clothName') closet.name = e.target.value;
@@ -4553,10 +4002,7 @@ $('#saveClothBtn').addEventListener('click', async () => {
       const blob = await dataURLToBlob(imgState.src);
       imageId = 'img_' + newId;
       await imageDB.put(imageId, blob);
-    } catch(e) {
-      console.warn('save to IDB failed, fallback to base64', e);
-      imageId = null;
-    }
+    } catch(e) { console.warn('save to IDB failed, fallback to base64', e); imageId = null; }
   }
   const item = {
     id: newId, cat: closet.cat, name: closet.name.trim() || meta.label,
@@ -4569,10 +4015,7 @@ $('#saveClothBtn').addEventListener('click', async () => {
   state.clothes.push(item);
   saveClothes();
   if (imageId) {
-    try {
-      const blob = await imageDB.get(imageId);
-      if (blob) imageCache[imageId] = URL.createObjectURL(blob);
-    } catch(e){}
+    try { const blob = await imageDB.get(imageId); if (blob) imageCache[imageId] = URL.createObjectURL(blob); } catch(e){}
   }
   renderLibrary(); renderAIMatch(); renderFreeSlots(); renderFreeOptions();
   alert('已保存到衣橱！');
@@ -4592,7 +4035,6 @@ $('#addSuppBtn').addEventListener('click', () => {
   renderSupplements();
 });
 
-/* ===== 跨天自动刷新 ===== */
 let lastDayKey = todayStr();
 function checkDayChange(){
   const d = todayStr();
@@ -4609,7 +4051,6 @@ function checkDayChange(){
   fetchWeatherAndUpdate();
 }
 
-/* ===== 启动 ===== */
 function init(){
   cleanupOldChecks(); cleanupOldSets(); cleanupOldSportSessions();
   loadTransactions(); buildCalendarFromPlans(); renderMoney();
@@ -4620,12 +4061,10 @@ function init(){
   renderHomeDate(); renderHomeTimeline();
   fetchWeatherAndUpdate();
   setInterval(fetchWeatherAndUpdate, 30 * 60 * 1000);
-
   preloadAllImages().then(() => {
     renderLibrary(); renderAIMatch();
     renderFreeSlots(); renderFreeOptions();
   }).catch(e => console.warn('preload images failed', e));
-
   try {
     if (window.AndroidBridge) {
       const sitOn = Store.load('app_setting_sit_reminder', true);
@@ -4634,14 +4073,12 @@ function init(){
       if (typeof AndroidBridge.setBackupReminder === 'function') AndroidBridge.setBackupReminder(!!notifOn);
     }
   } catch(err){ console.warn('sync settings to android failed', err); }
-
   try {
     if (window.AndroidBridge && typeof AndroidBridge.saveDailyBackup === 'function' && window.__collectBackup) {
       const pack = window.__collectBackup();
       AndroidBridge.saveDailyBackup(JSON.stringify(pack));
     }
   } catch(e) { console.warn('daily backup failed', e); }
-
   setInterval(() => { cleanupOldChecks(); cleanupOldSets(); cleanupOldSportSessions(); }, 5 * 60 * 1000);
   setInterval(checkDayChange, 60 * 1000);
   setInterval(updateSportTimerText, 1000);
@@ -4658,26 +4095,15 @@ init();
   const chatClearBtn = document.getElementById('chatClearBtn');
   const chatEmpty = document.getElementById('chatEmpty');
   if (!chatPanel) return;
-
   let messages = [];
   let pendingAIBubble = null;
   let pendingText = '';
   let isWaiting = false;
 
-  function loadHistory(){
-    try { messages = JSON.parse(window.__appStorageGet('chatHistory') || '[]'); } catch(e){ messages = []; }
-  }
-  function saveHistory(){
-    try { window.__appStorageSet('chatHistory', JSON.stringify(messages.slice(-50))); } catch(e){}
-  }
-  function scrollBottom(){
-    setTimeout(() => { chatBody.scrollTop = chatBody.scrollHeight; }, 20);
-  }
-  function escapeHtml(s){
-    return String(s == null ? '' : s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
+  function loadHistory(){ try { messages = JSON.parse(window.__appStorageGet('chatHistory') || '[]'); } catch(e){ messages = []; } }
+  function saveHistory(){ try { window.__appStorageSet('chatHistory', JSON.stringify(messages.slice(-50))); } catch(e){} }
+  function scrollBottom(){ setTimeout(() => { chatBody.scrollTop = chatBody.scrollHeight; }, 20); }
+  function escapeHtml(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   function appendBubble(role, text){
     const div = document.createElement('div');
     div.className = 'chat-msg ' + (role === 'user' ? 'user' : role === 'system' ? 'system' : 'ai');
@@ -4702,7 +4128,6 @@ init();
     return chatBody.querySelector('.chat-msg:last-child .bubble');
   }
   function setWaiting(v){ isWaiting = v; chatSendBtn.disabled = v; }
-
   function buildContextSnapshot(){
     try {
       const now = new Date();
@@ -4714,8 +4139,7 @@ init();
       const monthInc = monthTx.filter(x => x.type === 'income').reduce((s, x) => s + x.amount, 0);
       const catMap = {};
       monthTx.filter(x => x.type === 'expense').forEach(x => { catMap[x.category] = (catMap[x.category] || 0) + x.amount; });
-      const topCats = Object.entries(catMap).sort((a,b) => b[1]-a[1]).slice(0,3)
-        .map(([k,v]) => `${k}¥${v.toFixed(0)}`).join('、') || '无';
+      const topCats = Object.entries(catMap).sort((a,b) => b[1]-a[1]).slice(0,3).map(([k,v]) => `${k}¥${v.toFixed(0)}`).join('、') || '无';
       const sessions = getSportSessions();
       let sportCount = 0, sportMin = 0;
       for (let i = 0; i < 7; i++) {
@@ -4745,14 +4169,12 @@ init();
       ].filter(Boolean).join('\n');
     } catch(e) { console.warn('snapshot failed', e); return ''; }
   }
-
   function sendMessage(){
     const text = chatInput.value.trim();
     if (!text || isWaiting) return;
     chatInput.value = '';
     chatInput.style.height = 'auto';
     addMessage('user', text);
-
     if (!window.AndroidBridge || typeof AndroidBridge.sendChat !== 'function') {
       addMessage('system', 'AI 聊天功能暂不可用（未接入 Android 端）');
       return;
@@ -4763,38 +4185,25 @@ init();
     setWaiting(true);
     try {
       const snapshot = buildContextSnapshot();
-      const payload = snapshot
-        ? `【用户当前数据（仅内部参考，非用户直接输入）】\n${snapshot}\n\n【用户问题】\n${text}`
-        : text;
+      const payload = snapshot ? `【用户当前数据（仅内部参考，非用户直接输入）】\n${snapshot}\n\n【用户问题】\n${text}` : text;
       AndroidBridge.sendChat(payload);
     } catch(e) {
       setWaiting(false);
       if (pendingAIBubble) pendingAIBubble.textContent = '发送失败：' + e.message;
     }
   }
-
   function requestAIStyling(){
     const scene = state.aiScene || '通勤';
     const clothes = state.clothes || [];
     const card = document.getElementById('aiStylingCard');
     if (!card) return;
-    if (!clothes.length) {
-      card.innerHTML = '<p class="tip" style="color:#8A90A2">衣橱还没有单品，先去「增加衣服」添加</p>';
-      return;
-    }
+    if (!clothes.length) { card.innerHTML = '<p class="tip" style="color:#8A90A2">衣橱还没有单品，先去「增加衣服」添加</p>'; return; }
     const list = clothes.map((c, i) => {
       const meta = CATEGORIES[c.cat];
       return `${i+1}. 品类:${meta.label} | 名称:${c.name||meta.label} | 颜色:${c.color||'未知'} | 季节:${c.season||'不限'} | 场合:${c.occasion||'不限'}`;
     }).join('\n');
-    const prompt =
-      `我衣橱里有以下单品：\n${list}\n\n` +
-      `请挑选一套适合【${scene}】场景的搭配，3-4 件，必须包含上装和下装/裙装。\n` +
-      `务必只返回 JSON，不要任何解释文字，格式：\n` +
-      `{"reason":"一句话说明为什么这么搭","items":[{"cat":"top","name":"单品名称"},{"cat":"pants","name":"单品名称"},{"cat":"shoes","name":"单品名称"}]}\n` +
-      `cat 只能是 top/pants/dress/coat/shoes/bag/acc；name 必须与清单里的名称完全一致。`;
-
+    const prompt = `我衣橱里有以下单品：\n${list}\n\n请挑选一套适合【${scene}】场景的搭配，3-4 件，必须包含上装和下装/裙装。\n务必只返回 JSON，不要任何解释文字，格式：\n{"reason":"一句话说明为什么这么搭","items":[{"cat":"top","name":"单品名称"},{"cat":"pants","name":"单品名称"},{"cat":"shoes","name":"单品名称"}]}\ncat 只能是 top/pants/dress/coat/shoes/bag/acc；name 必须与清单里的名称完全一致。`;
     card.innerHTML = '<div style="text-align:center;padding:24px 12px"><div class="chat-typing" style="width:12px;height:24px"></div><p style="margin-top:12px;font-size:13px;color:#8A90A2">AI 正在为你搭配…</p></div>';
-
     if (window.AndroidBridge && typeof AndroidBridge.sendStyling === 'function') {
       window.__stylingBuf = '';
       window.__stylingScene = scene;
@@ -4803,15 +4212,11 @@ init();
       card.innerHTML = '<div class="alert-box">AI 搭配需要 Android 端支持</div>';
     }
   }
-
   function renderStylingResult(raw){
     const card = document.getElementById('aiStylingCard');
     if (!card) return;
     let data = null;
-    try {
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) data = JSON.parse(match[0]);
-    } catch(e) { console.warn('parse styling failed', e); }
+    try { const match = raw.match(/\{[\s\S]*\}/); if (match) data = JSON.parse(match[0]); } catch(e) { console.warn('parse styling failed', e); }
     if (!data || !data.items || !data.items.length) {
       card.innerHTML = `<div class="alert-box">AI 没能返回有效搭配，请重试</div><div style="margin-top:8px;font-size:11px;color:#8A90A2;word-break:break-all">AI 原文：${escapeHtml(raw.slice(0,300))}</div>`;
       return;
@@ -4822,36 +4227,18 @@ init();
       if (!found) found = state.clothes.find(c => c.cat === it.cat && !picks.some(p => p.id === c.id));
       if (found && !picks.some(p => p.id === found.id)) picks.push(found);
     });
-    if (!picks.length) {
-      card.innerHTML = '<div class="alert-box">AI 推荐的单品不在衣橱里，请重试</div>';
-      return;
-    }
+    if (!picks.length) { card.innerHTML = '<div class="alert-box">AI 推荐的单品不在衣橱里，请重试</div>'; return; }
     const cards = picks.map(c => {
       const meta = CATEGORIES[c.cat];
       const imgUrl = c.imageId ? (imageCache[c.imageId] || '') : (c.image || '');
-      const thumb = imgUrl
-        ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:contain">`
-        : `<span style="font-size:24px">${meta.icon}</span>`;
-      return `<div style="flex:none;width:96px;background:#F7F8FC;border-radius:14px;padding:8px 6px;text-align:center;font-size:11px;color:#5A6175">
-        <div style="height:90px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:6px">${thumb}</div>
-        <div style="font-weight:600;color:#1B1F2A;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.name || meta.label)}</div>
-        <div style="font-size:10px;color:#8A90A2;margin-top:2px">${meta.label}</div>
-      </div>`;
+      const thumb = imgUrl ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:contain">` : `<span style="font-size:24px">${meta.icon}</span>`;
+      return `<div style="flex:none;width:96px;background:#F7F8FC;border-radius:14px;padding:8px 6px;text-align:center;font-size:11px;color:#5A6175"><div style="height:90px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:6px">${thumb}</div><div style="font-weight:600;color:#1B1F2A;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.name || meta.label)}</div><div style="font-size:10px;color:#8A90A2;margin-top:2px">${meta.label}</div></div>`;
     }).join('');
-    card.innerHTML = `
-      <div class="card-title">✨ AI 推荐搭配 <span class="tag on">${escapeHtml(window.__stylingScene || state.aiScene || '')}</span></div>
-      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none">${cards}</div>
-      ${data.reason ? `<div class="suggest-box" style="margin-top:12px">${escapeHtml(data.reason)}</div>` : ''}
-      <button class="btn-ghost" id="aiStylingRetryBtn" style="margin-top:12px">↻ 换一套</button>
-    `;
+    card.innerHTML = `<div class="card-title">✨ AI 推荐搭配 <span class="tag on">${escapeHtml(window.__stylingScene || state.aiScene || '')}</span></div><div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none">${cards}</div>${data.reason ? `<div class="suggest-box" style="margin-top:12px">${escapeHtml(data.reason)}</div>` : ''}<button class="btn-ghost" id="aiStylingRetryBtn" style="margin-top:12px">↻ 换一套</button>`;
     document.getElementById('aiStylingRetryBtn')?.addEventListener('click', requestAIStyling);
   }
-
   window.onNativeChatResult = function(chunk, tag){
-    if (tag === 'styling') {
-      window.__stylingBuf = (window.__stylingBuf || '') + String(chunk || '');
-      return;
-    }
+    if (tag === 'styling') { window.__stylingBuf = (window.__stylingBuf || '') + String(chunk || ''); return; }
     if (!pendingAIBubble) return;
     pendingText += String(chunk || '');
     pendingAIBubble.textContent = pendingText;
@@ -4876,30 +4263,19 @@ init();
   window.onNativeChatState = function(state, tag){
     if (tag === 'styling') {
       if (state === 'finished') {
-        if (!window.__reportCtx) {
-          renderStylingResult(window.__stylingBuf || '');
-          window.__stylingBuf = '';
-        }
+        if (!window.__reportCtx) { renderStylingResult(window.__stylingBuf || ''); window.__stylingBuf = ''; }
       }
       return;
     }
     if (state === 'finished') {
       setWaiting(false);
-      if (messages.length && messages[messages.length-1].role === 'ai') {
-        messages[messages.length-1].text = pendingText;
-        saveHistory();
-      }
+      if (messages.length && messages[messages.length-1].role === 'ai') { messages[messages.length-1].text = pendingText; saveHistory(); }
       pendingAIBubble = null;
       pendingText = '';
     }
   };
-
   document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-open-chat]')) {
-      chatPanel.classList.add('show');
-      scrollBottom();
-      setTimeout(() => chatInput.focus(), 200);
-    }
+    if (e.target.closest('[data-open-chat]')) { chatPanel.classList.add('show'); scrollBottom(); setTimeout(() => chatInput.focus(), 200); }
   });
   chatCloseBtn.addEventListener('click', () => chatPanel.classList.remove('show'));
   chatClearBtn.addEventListener('click', () => {
@@ -4908,23 +4284,16 @@ init();
     addMessage('system', '对话已清空');
   });
   chatSendBtn.addEventListener('click', sendMessage);
-  chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-  chatInput.addEventListener('input', () => {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = Math.min(100, chatInput.scrollHeight) + 'px';
-  });
+  chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+  chatInput.addEventListener('input', () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(100, chatInput.scrollHeight) + 'px'; });
   document.getElementById('chatQuick').addEventListener('click', (e) => {
     const chip = e.target.closest('.qchip');
     if (!chip) return;
     chatInput.value = chip.dataset.q || chip.textContent;
     sendMessage();
   });
-
   const stylingBtn = document.getElementById('aiStylingBtn');
   if (stylingBtn) stylingBtn.addEventListener('click', requestAIStyling);
-
   document.getElementById('aiSceneChips')?.addEventListener('click', (e) => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
@@ -4933,9 +4302,7 @@ init();
     state.aiScene = chip.dataset.scene;
     Store.save('aiScene', state.aiScene);
   });
-
-  loadHistory();
-  renderAll();
+  loadHistory(); renderAll();
 })();
 
 /* ========== 周报 / 月报 ========== */
@@ -4961,28 +4328,19 @@ init();
     const last = new Date(y, m + 1, 0);
     return { start: fmtDate(first), end: fmtDate(last), startD: first, endD: last, label: `${first.getFullYear()}年${first.getMonth()+1}月` };
   }
-  function inRange(dateStr, range){
-    return dateStr >= range.start && dateStr <= range.end;
-  }
-
+  function inRange(dateStr, range){ return dateStr >= range.start && dateStr <= range.end; }
   function collectStats(range){
     const sessions = getSportSessions();
     let sportCount = 0, sportMin = 0;
     Object.keys(sessions).forEach(d => {
       if (!inRange(d, range)) return;
       const s = sessions[d];
-      if (s && s.endTs) {
-        sportCount++;
-        sportMin += Math.round((s.endTs - s.startTs) / 60000);
-      }
+      if (s && s.endTs) { sportCount++; sportMin += Math.round((s.endTs - s.startTs) / 60000); }
     });
     let todoTotal = 0, todoDone = 0;
     Object.keys(state.calendarData).forEach(d => {
       if (!inRange(d, range)) return;
-      (state.calendarData[d] || []).forEach(it => {
-        todoTotal++;
-        if (it.done) todoDone++;
-      });
+      (state.calendarData[d] || []).forEach(it => { todoTotal++; if (it.done) todoDone++; });
     });
     const txList = state.transactions.filter(x => inRange(x.date, range));
     const txExp = txList.filter(x => x.type === 'expense');
@@ -5007,28 +4365,20 @@ init();
       weightMin = Math.min.apply(null, inRangeBody.map(x => x.weight));
       weightMax = Math.max.apply(null, inRangeBody.map(x => x.weight));
     }
-    return {
-      range, sportCount, sportMin, todoTotal, todoDone,
-      txCount: txList.length, totalExp, totalInc, topCats, skinDone,
-      weightStart, weightEnd, weightMin, weightMax
-    };
+    return { range, sportCount, sportMin, todoTotal, todoDone, txCount: txList.length, totalExp, totalInc, topCats, skinDone, weightStart, weightEnd, weightMin, weightMax };
   }
-
   function diffDelta(cur, prev){
     const d = cur - prev;
     if (Math.abs(d) < 0.01) return { text: '持平', cls: 'same', d: 0 };
     return d > 0 ? { text: `↑ ${d.toFixed(d < 10 ? 1 : 0)}`, cls: 'down', d } : { text: `↓ ${Math.abs(d).toFixed(Math.abs(d) < 10 ? 1 : 0)}`, cls: 'up', d };
   }
-
   function renderReport(report, aiText, aiPending){
     const range = report.cur.range;
     const cur = report.cur, prev = report.prev;
     const label = report.type === 'week' ? '周报' : '月报';
     const rangeLabel = report.type === 'week' ? `${range.start} ~ ${range.end}` : range.label;
-
     reportHeaderTitle.textContent = label;
     let html = `<div class="report-title">${label}</div><div class="report-sub">${rangeLabel}</div>`;
-
     const sportDelta = diffDelta(cur.sportCount, prev.sportCount);
     const minDelta = diffDelta(cur.sportMin, prev.sportMin);
     html += `<div class="report-grid">
@@ -5037,57 +4387,37 @@ init();
       <div class="report-cell"><div class="rc-label">记账笔数</div><div class="rc-value">${cur.txCount} 笔</div><div class="rc-delta ${diffDelta(cur.txCount, prev.txCount).cls}">${diffDelta(cur.txCount, prev.txCount).text}</div></div>
       <div class="report-cell"><div class="rc-label">护肤打卡</div><div class="rc-value">${cur.skinDone} 项</div><div class="rc-delta ${diffDelta(cur.skinDone, prev.skinDone).cls}">${diffDelta(cur.skinDone, prev.skinDone).text}</div></div>
     </div>`;
-
     if (cur.weightStart !== null && cur.weightEnd !== null) {
       const wd = cur.weightEnd - cur.weightStart;
       const wdText = wd > 0.05 ? `↑ ${wd.toFixed(1)} kg` : wd < -0.05 ? `↓ ${Math.abs(wd).toFixed(1)} kg` : '持平';
       const wdCls = wd > 0.05 ? 'warn' : wd < -0.05 ? 'good' : '';
-      html += `<div class="report-card">
-        <div class="rc-title">⚖️ 体重变化</div>
+      html += `<div class="report-card"><div class="rc-title">⚖️ 体重变化</div>
         <div class="report-line"><span class="rl-k">期初 → 期末</span><span class="rl-v">${cur.weightStart.toFixed(1)} → ${cur.weightEnd.toFixed(1)} kg</span></div>
         <div class="report-line"><span class="rl-k">变化</span><span class="rl-v ${wdCls}">${wdText}</span></div>
         <div class="report-line"><span class="rl-k">区间最低/最高</span><span class="rl-v">${cur.weightMin.toFixed(1)} / ${cur.weightMax.toFixed(1)} kg</span></div>
       </div>`;
     }
-
     if (cur.todoTotal > 0) {
       const pct = Math.round(cur.todoDone / cur.todoTotal * 100);
       const cls = pct >= 80 ? 'good' : pct >= 50 ? '' : 'warn';
-      html += `<div class="report-card">
-        <div class="rc-title">✅ 待办完成</div>
-        <div class="report-line"><span class="rl-k">完成</span><span class="rl-v ${cls}">${cur.todoDone} / ${cur.todoTotal}（${pct}%）</span></div>
-      </div>`;
+      html += `<div class="report-card"><div class="rc-title">✅ 待办完成</div><div class="report-line"><span class="rl-k">完成</span><span class="rl-v ${cls}">${cur.todoDone} / ${cur.todoTotal}（${pct}%）</span></div></div>`;
     }
-
     if (cur.txCount > 0) {
       const expDelta = diffDelta(cur.totalExp, prev.totalExp);
-      let catLines = cur.topCats.map(([k, v]) =>
-        `<div class="report-line"><span class="rl-k">${k}</span><span class="rl-v">¥ ${v.toFixed(2)}</span></div>`).join('');
-      html += `<div class="report-card">
-        <div class="rc-title">💰 账目</div>
+      let catLines = cur.topCats.map(([k, v]) => `<div class="report-line"><span class="rl-k">${k}</span><span class="rl-v">¥ ${v.toFixed(2)}</span></div>`).join('');
+      html += `<div class="report-card"><div class="rc-title">💰 账目</div>
         <div class="report-line"><span class="rl-k">支出</span><span class="rl-v">¥ ${cur.totalExp.toFixed(2)} <span style="font-size:11.5px;color:${expDelta.cls==='up'?'#FF6B5B':expDelta.cls==='down'?'#1FBFA9':'#8A90A2'}">${expDelta.text}</span></span></div>
         <div class="report-line"><span class="rl-k">收入</span><span class="rl-v">¥ ${cur.totalInc.toFixed(2)}</span></div>
         <div class="report-line"><span class="rl-k">结余</span><span class="rl-v">¥ ${(cur.totalInc - cur.totalExp).toFixed(2)}</span></div>
         ${catLines ? `<div style="font-size:11.5px;color:#8A90A2;margin-top:10px;margin-bottom:4px">支出前几类：</div>${catLines}` : ''}
       </div>`;
     }
-
-    html += `<div class="report-card">
-      <div class="rc-title">🤖 AI 小结</div>
-      <div class="report-ai" id="reportAiBox">${aiPending ? '<span class="ai-typing"></span>' : (aiText || '（AI 未生成小结）')}</div>
-    </div>`;
-
-    html += `<div class="report-actions">
-      <button class="secondary" id="reportRegenBtn">↻ 重新生成</button>
-      <button class="primary" id="reportCloseBottomBtn">完成</button>
-    </div>`;
-
+    html += `<div class="report-card"><div class="rc-title">🤖 AI 小结</div><div class="report-ai" id="reportAiBox">${aiPending ? '<span class="ai-typing"></span>' : (aiText || '（AI 未生成小结）')}</div></div>`;
+    html += `<div class="report-actions"><button class="secondary" id="reportRegenBtn">↻ 重新生成</button><button class="primary" id="reportCloseBottomBtn">完成</button></div>`;
     reportBody.innerHTML = html;
-
     document.getElementById('reportCloseBottomBtn')?.addEventListener('click', () => reportPanel.classList.remove('show'));
     document.getElementById('reportRegenBtn')?.addEventListener('click', () => generateReport(report.type, true));
   }
-
   function buildAiPrompt(type, cur, prev){
     const label = type === 'week' ? '本周' : '本月';
     const lastLabel = type === 'week' ? '上周' : '上月';
@@ -5104,52 +4434,30 @@ init();
       prev.todoTotal > 0 ? `待办：完成 ${prev.todoDone}/${prev.todoTotal}` : '',
       `护肤打卡：${prev.skinDone} 项`
     ].filter(Boolean).join('\n');
-    return `请为我的健康 ${label}写一段简短总结（80-150字），语气温和鼓励，指出 1-2 个亮点，1 个可以改进的地方，给出 1 条具体建议。不要用列表，直接写成连贯的段落。
-
-【${lastLabel}】\n${prevText}
-
-【${label}】\n${curText}`;
+    return `请为我的健康 ${label}写一段简短总结（80-150字），语气温和鼓励，指出 1-2 个亮点，1 个可以改进的地方，给出 1 条具体建议。不要用列表，直接写成连贯的段落。\n\n【${lastLabel}】\n${prevText}\n\n【${label}】\n${curText}`;
   }
-
   function generateReport(type, forceRegen){
     let curRange, prevRange;
-    if (type === 'week') {
-      curRange = getWeekRange(-1);
-      prevRange = getWeekRange(-2);
-    } else {
-      curRange = getMonthRange(-1);
-      prevRange = getMonthRange(-2);
-    }
+    if (type === 'week') { curRange = getWeekRange(-1); prevRange = getWeekRange(-2); }
+    else { curRange = getMonthRange(-1); prevRange = getMonthRange(-2); }
     const cur = collectStats(curRange);
     const prev = collectStats(prevRange);
     const report = { type, cur, prev, generatedAt: Date.now() };
-
     reportPanel.classList.add('show');
     reportBody.scrollTop = 0;
-
     renderReport(report, '', true);
-
     if (window.AndroidBridge && typeof AndroidBridge.sendStyling === 'function') {
       window.__reportAiBuf = '';
       window.__reportCtx = { type };
       const prompt = buildAiPrompt(type, cur, prev);
-      try {
-        AndroidBridge.sendStyling(prompt);
-      } catch(e) {
-        setReportAiText('AI 服务不可用');
-      }
-    } else {
-      setReportAiText('（当前环境无 AI 服务）');
-    }
-
+      try { AndroidBridge.sendStyling(prompt); } catch(e) { setReportAiText('AI 服务不可用'); }
+    } else { setReportAiText('（当前环境无 AI 服务）'); }
     saveReportToHistory(report);
   }
-
   function setReportAiText(text){
     const box = document.getElementById('reportAiBox');
     if (box) box.textContent = text;
   }
-
   function saveReportToHistory(report){
     try {
       const list = Store.load('reportHistory', []);
@@ -5160,21 +4468,13 @@ init();
         rangeStart: report.cur.range.start,
         rangeEnd: report.cur.range.end,
         generatedAt: Date.now(),
-        stats: {
-          sportCount: report.cur.sportCount,
-          sportMin: report.cur.sportMin,
-          txCount: report.cur.txCount,
-          totalExp: report.cur.totalExp,
-          skinDone: report.cur.skinDone,
-          weightEnd: report.cur.weightEnd
-        }
+        stats: { sportCount: report.cur.sportCount, sportMin: report.cur.sportMin, txCount: report.cur.txCount, totalExp: report.cur.totalExp, skinDone: report.cur.skinDone, weightEnd: report.cur.weightEnd }
       };
       if (exist >= 0) list[exist] = item; else list.push(item);
       list.sort((a, b) => b.generatedAt - a.generatedAt);
       Store.save('reportHistory', list.slice(0, 20));
     } catch(e){}
   }
-
   const _origChatResult = window.onNativeChatResult;
   window.onNativeChatResult = function(chunk, tag){
     if (tag === 'styling' && window.__reportCtx) {
@@ -5186,23 +4486,14 @@ init();
   };
   const _origChatState = window.onNativeChatState;
   window.onNativeChatState = function(state, tag){
-    if (tag === 'styling' && window.__reportCtx && state === 'finished') {
-      window.__reportCtx = null;
-      window.__stylingBuf = '';
-      return;
-    }
+    if (tag === 'styling' && window.__reportCtx && state === 'finished') { window.__reportCtx = null; window.__stylingBuf = ''; return; }
     if (typeof _origChatState === 'function') _origChatState(state, tag);
   };
   const _origChatError = window.onNativeChatError;
   window.onNativeChatError = function(msg, tag){
-    if (tag === 'styling' && window.__reportCtx) {
-      setReportAiText('AI 生成失败：' + (msg || '未知错误'));
-      window.__reportCtx = null;
-      return;
-    }
+    if (tag === 'styling' && window.__reportCtx) { setReportAiText('AI 生成失败：' + (msg || '未知错误')); window.__reportCtx = null; return; }
     if (typeof _origChatError === 'function') _origChatError(msg, tag);
   };
-
   function showHistory(){
     const list = Store.load('reportHistory', []);
     let html = '<div class="report-title">历史报告</div>';
@@ -5226,16 +4517,11 @@ init();
     html += '<div class="report-actions"><button class="secondary" id="reportBackBtn" style="flex:1">返回</button></div>';
     reportHeaderTitle.textContent = '历史报告';
     reportBody.innerHTML = html;
-    document.getElementById('reportBackBtn')?.addEventListener('click', () => {
-      reportPanel.classList.remove('show');
-    });
+    document.getElementById('reportBackBtn')?.addEventListener('click', () => { reportPanel.classList.remove('show'); });
     reportBody.querySelectorAll('[data-replay-type]').forEach(el => {
-      el.addEventListener('click', () => {
-        generateReport(el.dataset.replayType, true);
-      });
+      el.addEventListener('click', () => { generateReport(el.dataset.replayType, true); });
     });
   }
-
   function checkAutoGenerate(){
     const now = new Date();
     const dow = now.getDay();
@@ -5263,38 +4549,24 @@ init();
       }
     }
   }
-
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-open-report]')) {
-      generateReport('week');
-    }
-  });
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-open-report]')) generateReport('week'); });
   reportCloseBtn.addEventListener('click', () => reportPanel.classList.remove('show'));
   reportHistoryBtn.addEventListener('click', showHistory);
-
   window.__generateReport = generateReport;
-
   setTimeout(checkAutoGenerate, 3000);
 })();
 
 /* ========== 增强补丁：设置 / 备份 / 导入原生桥接 ========== */
 (function(){
   if (window.__enhancedV3) return; window.__enhancedV3 = true;
-
-  function getSetting(key, def){
-    try { const v = window.__appStorageGet('app_setting_'+key); return v===null?def:JSON.parse(v); }
-    catch(e){ return def; }
-  }
-  function saveSetting(key, val){
-    window.__appStorageSet('app_setting_'+key, JSON.stringify(val));
-  }
+  function getSetting(key, def){ try { const v = window.__appStorageGet('app_setting_'+key); return v===null?def:JSON.parse(v); } catch(e){ return def; } }
+  function saveSetting(key, val){ window.__appStorageSet('app_setting_'+key, JSON.stringify(val)); }
   window.getAppSetting = getSetting;
   window.saveAppSetting = saveSetting;
 
   const BACKUP_KEYS = [
     'app_body','app_setsDone','app_supplements','app_profile','app_customCats',
-    'app_skinState','app_freeSlots',
-    'app_selectedDate','app_calYear','app_calMonth','app_exportRange','app_aiScene','app_libFilter',
+    'app_skinState','app_freeSlots','app_selectedDate','app_calYear','app_calMonth','app_exportRange','app_aiScene','app_libFilter',
     'app_customSkinSteps','app_setting_sit_reminder','app_setting_notification',
     'app_setting_voice_duration','app_setting_sport_timeout',
     'app_bodyHistory','app_noteCategoryMap','app_skinStateDate','app_lastWeather',
@@ -5302,28 +4574,18 @@ init();
     'sportSessions','transactions','clothes','skinProducts',
     'lastBackupAt','firstUseAt','last_sit_reminder'
   ];
-
   function collectBackup(){
     const data = {};
     const keys = {};
     BACKUP_KEYS.forEach(k => { keys[k] = 1; });
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k) keys[k] = 1;
-      }
-    } catch(e){}
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k) keys[k] = 1; } } catch(e){}
     Object.keys(keys).forEach(k => {
       if (k === 'last_crash') return;
-      try {
-        const v = window.__appStorageGet(k);
-        if (v !== null && v !== undefined && v !== '') data[k] = v;
-      } catch(e){}
+      try { const v = window.__appStorageGet(k); if (v !== null && v !== undefined && v !== '') data[k] = v; } catch(e){}
     });
     return { version:1, app:'health-life', exportedAt:new Date().toISOString(), data };
   }
   window.__collectBackup = collectBackup;
-
   window.onBackupFileContent = function(json){
     try {
       const pack = JSON.parse(json);
@@ -5337,14 +4599,9 @@ init();
       window.__appStorageSet('lastBackupAt', String(Date.now()));
       alert(`已恢复 ${ok} 项数据。App 将重启。`);
       setTimeout(() => { try { location.reload(); } catch(e){} }, 800);
-    } catch(e) {
-      alert('备份文件格式错误：' + e.message);
-    }
+    } catch(e) { alert('备份文件格式错误：' + e.message); }
   };
-  window.onBackupFileError = function(msg){
-    alert('读取备份失败：' + (msg || '未知错误'));
-  };
-
+  window.onBackupFileError = function(msg){ alert('读取备份失败：' + (msg || '未知错误')); };
   function downloadCsv(rows, filename){
     const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
@@ -5379,10 +4636,7 @@ init();
     const keys = Object.keys(checks).filter(k => k.indexOf('skin_') === 0).sort();
     if (!keys.length) { alert('暂无护肤打卡记录'); return; }
     const rows = [['日期','步骤ID','已完成']];
-    keys.forEach(k => {
-      const m = k.match(/^skin_(\d{4}-\d{2}-\d{2})_(.+)$/);
-      if (m) rows.push([m[1], m[2], '是']);
-    });
+    keys.forEach(k => { const m = k.match(/^skin_(\d{4}-\d{2}-\d{2})_(.+)$/); if (m) rows.push([m[1], m[2], '是']); });
     downloadCsv(rows, `护肤打卡_${todayStr()}.csv`);
   }
   function exportTxCsv(){
@@ -5394,7 +4648,6 @@ init();
     });
     downloadCsv(rows, `记账记录_${todayStr()}.csv`);
   }
-
   function exportBackup(){
     let pack;
     try { pack = collectBackup(); } catch(e){ alert('读取数据失败：' + e.message); return; }
@@ -5402,7 +4655,6 @@ init();
     if (!count) { alert('暂无可导出的数据'); return; }
     const json = JSON.stringify(pack, null, 2);
     window.__appStorageSet('lastBackupAt', String(Date.now()));
-
     try {
       if (window.AndroidBridge && typeof AndroidBridge.saveBackup === 'function') {
         AndroidBridge.saveBackup(json);
@@ -5410,55 +4662,38 @@ init();
         return;
       }
     } catch(e){}
-
     let downloaded = false;
     try {
       const blob = new Blob([json], { type:'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `健康生活备份_${todayStr()}.json`;
+      a.href = url; a.download = `健康生活备份_${todayStr()}.json`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 3000);
       downloaded = true;
     } catch(e){}
-
     const ta = document.getElementById('backupTextBox');
-    if (ta) {
-      ta.value = json;
-      ta.style.display = 'block';
-      try { ta.focus(); ta.select(); } catch(e){}
-    }
+    if (ta) { ta.value = json; ta.style.display = 'block'; try { ta.focus(); ta.select(); } catch(e){} }
     if (downloaded) alert(`已生成备份文件（共 ${count} 项数据）。`);
     else alert(`已在下方生成备份文本（共 ${count} 项数据），请长按复制。`);
   }
-
   function importBackup(file){
     const reader = new FileReader();
-    reader.onload = function(ev){
-      window.onBackupFileContent(ev.target.result);
-    };
+    reader.onload = function(ev){ window.onBackupFileContent(ev.target.result); };
     reader.readAsText(file);
   }
-
   function clearAllData(){
     if (!confirm('⚠️ 即将删除全部数据。确定继续？')) return;
     if (!confirm('请再次确认：真的要清空所有数据吗？')) return;
     const keys = {};
     BACKUP_KEYS.forEach(k => { keys[k] = 1; });
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k !== 'firstUseAt') keys[k] = 1;
-      }
-    } catch(e){}
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k !== 'firstUseAt') keys[k] = 1; } } catch(e){}
     Object.keys(keys).forEach(k => { try { window.__appStorageRemove(k); } catch(e){} });
     try { localStorage.clear(); } catch(e){}
     try { if (imageDB._db) imageDB._db.close(); indexedDB.deleteDatabase('health_app_images'); } catch(e){}
     alert('已清空所有数据。');
     setTimeout(() => { try { location.reload(); } catch(e){} }, 800);
   }
-
   function sendNotification(title, body){
     try {
       if (!getSetting('notification', true)) return;
@@ -5471,6 +4706,7 @@ init();
   }
   window.sendAppNotification = sendNotification;
 
+  /* ★ 久坐提醒：8:00 ~ 17:00 之间触发 */
   function initSitReminder(){
     try { window.__lastSitReminder = parseInt(window.__appStorageGet('last_sit_reminder') || '0'); } catch(e){ window.__lastSitReminder = 0; }
     if (!window.__lastSitReminder) {
@@ -5479,6 +4715,8 @@ init();
     }
     setInterval(function(){
       if (!getSetting('sit_reminder', true)) return;
+      const h = new Date().getHours();
+      if (h < 8 || h >= 17) return;
       const now = Date.now();
       if (now - window.__lastSitReminder < 30 * 60 * 1000) return;
       window.__lastSitReminder = now;
@@ -5502,24 +4740,11 @@ init();
     d.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid #EDEFF5';
     d.innerHTML =
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:14px 0 4px">应用设置</div>' +
-      '<div class="set-row"><span class="lb">久坐提醒（每30分钟）</span>' +
-        '<select id="setSitReminder" style="' + SEL_CSS + '">' +
-        '<option value="1"' + (sit?' selected':'') + '>开</option>' +
-        '<option value="0"' + (!sit?' selected':'') + '>关</option></select></div>' +
-      '<div class="set-row"><span class="lb">后台通知 / 备份提醒</span>' +
-        '<select id="setNotification" style="' + SEL_CSS + '">' +
-        '<option value="1"' + (notif?' selected':'') + '>开</option>' +
-        '<option value="0"' + (!notif?' selected':'') + '>关</option></select></div>' +
-      '<div class="set-row"><span class="lb">语音时长</span>' +
-        '<select id="setVoiceDuration" style="' + SEL_CSS + '">' +
-        '<option value="10"' + (vd==10?' selected':'') + '>10 秒</option>' +
-        '<option value="15"' + (vd==15?' selected':'') + '>15 秒</option>' +
-        '<option value="20"' + (vd==20?' selected':'') + '>20 秒</option></select></div>' +
-      '<div class="set-row"><span class="lb">训练超时提醒</span>' +
-        '<select id="setSportTimeout" style="' + SEL_CSS + '">' +
-        '<option value="1"' + (sport?' selected':'') + '>开</option>' +
-        '<option value="0"' + (!sport?' selected':'') + '>关</option></select></div>' +
-      '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">久坐提醒：App 在前台时每 30 分钟弹一次。语音时长修改后立即生效。</p>' +
+      '<div class="set-row"><span class="lb">久坐提醒（8:00–17:00，每30分钟）</span><select id="setSitReminder" style="' + SEL_CSS + '"><option value="1"' + (sit?' selected':'') + '>开</option><option value="0"' + (!sit?' selected':'') + '>关</option></select></div>' +
+      '<div class="set-row"><span class="lb">后台通知 / 备份提醒</span><select id="setNotification" style="' + SEL_CSS + '"><option value="1"' + (notif?' selected':'') + '>开</option><option value="0"' + (!notif?' selected':'') + '>关</option></select></div>' +
+      '<div class="set-row"><span class="lb">语音时长</span><select id="setVoiceDuration" style="' + SEL_CSS + '"><option value="10"' + (vd==10?' selected':'') + '>10 秒</option><option value="15"' + (vd==15?' selected':'') + '>15 秒</option><option value="20"' + (vd==20?' selected':'') + '>20 秒</option></select></div>' +
+      '<div class="set-row"><span class="lb">训练超时提醒</span><select id="setSportTimeout" style="' + SEL_CSS + '"><option value="1"' + (sport?' selected':'') + '>开</option><option value="0"' + (!sport?' selected':'') + '>关</option></select></div>' +
+      '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">久坐提醒：App 在前台时，仅 8:00–17:00 之间每 30 分钟弹一次。语音时长修改后立即生效。</p>' +
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">数据备份</div>' +
       '<button id="exportDataBtn" style="width:100%;border:none;font-family:inherit;font-size:14px;font-weight:600;color:#fff;padding:13px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#8B7CF6,#B39BFF);margin-bottom:8px">⬇️ 导出数据备份（JSON）</button>' +
       '<button id="importDataBtn" style="display:block;width:100%;border:1.5px solid #E3E6EF;font-family:inherit;font-size:14px;font-weight:600;color:#5A6175;padding:12px;border-radius:12px;cursor:pointer;background:#fff;box-sizing:border-box">⬆️ 导入备份文件</button>' +
@@ -5527,46 +4752,25 @@ init();
       '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">建议每 30 天导出一次。</p>' +
       '<textarea id="backupTextBox" readonly placeholder="点击上方按钮后，备份内容会显示在这里" style="display:none;width:100%;height:150px;margin-top:10px;border:1.5px solid #E3E6EF;border-radius:10px;padding:10px;font-size:11px;font-family:monospace;line-height:1.5;color:#3A4152;background:#fff;outline:none;box-sizing:border-box"></textarea>' +
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">健康报告</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-        '<button id="genWeekReportBtn" style="border:none;font-family:inherit;font-size:13px;font-weight:600;color:#fff;padding:12px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#1FBFA9,#5FD9C4)">📅 生成周报</button>' +
-        '<button id="genMonthReportBtn" style="border:none;font-family:inherit;font-size:13px;font-weight:600;color:#fff;padding:12px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#4A9EFF,#7FC4FF)">📆 生成月报</button>' +
-      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px"><button id="genWeekReportBtn" style="border:none;font-family:inherit;font-size:13px;font-weight:600;color:#fff;padding:12px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#1FBFA9,#5FD9C4)">📅 生成周报</button><button id="genMonthReportBtn" style="border:none;font-family:inherit;font-size:13px;font-weight:600;color:#fff;padding:12px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#4A9EFF,#7FC4FF)">📆 生成月报</button></div>' +
       '<button id="openReportHistoryBtn" style="width:100%;border:none;font-family:inherit;font-size:14px;font-weight:600;color:#5A6175;padding:13px;border-radius:12px;cursor:pointer;background:#F3F5F9;margin-bottom:12px">📂 查看历史报告</button>' +
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">分类导出（CSV）</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-        '<button id="exportWeightCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">⚖️ 体重体脂</button>' +
-        '<button id="exportSportCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">🏋️ 训练打卡</button>' +
-        '<button id="exportSkinCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">🌸 护肤打卡</button>' +
-        '<button id="exportTxCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">💰 记账记录</button>' +
-      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px"><button id="exportWeightCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">⚖️ 体重体脂</button><button id="exportSportCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">🏋️ 训练打卡</button><button id="exportSkinCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">🌸 护肤打卡</button><button id="exportTxCsvBtn" style="border:none;font-family:inherit;font-size:12.5px;font-weight:600;color:#5A6175;padding:10px;border-radius:10px;cursor:pointer;background:#F3F5F9">💰 记账记录</button></div>' +
       '<div style="font-size:12px;font-weight:700;color:#FF6B5B;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">危险操作</div>' +
       '<button id="clearAllDataBtn" style="width:100%;border:1.5px solid #FF6B5B;font-family:inherit;font-size:14px;font-weight:600;color:#FF6B5B;padding:13px;border-radius:12px;cursor:pointer;background:#FFEDEA">🗑️ 清空所有数据（不可恢复）</button>';
     b.appendChild(d);
 
     d.addEventListener('change', function(e){
       const id = e.target.id;
-      if (id === 'setSitReminder') {
-        const on = e.target.value === '1';
-        saveSetting('sit_reminder', on);
-        try { if (window.AndroidBridge && typeof AndroidBridge.setSitReminder === 'function') AndroidBridge.setSitReminder(on); } catch(err){}
-      }
+      if (id === 'setSitReminder') { const on = e.target.value === '1'; saveSetting('sit_reminder', on); try { if (window.AndroidBridge && typeof AndroidBridge.setSitReminder === 'function') AndroidBridge.setSitReminder(on); } catch(err){} }
       else if (id === 'setNotification') {
         const on = e.target.value === '1';
         saveSetting('notification', on);
-        if (on && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-          try { Notification.requestPermission(); } catch(e){}
-        }
+        if (on && typeof Notification !== 'undefined' && Notification.permission === 'default') { try { Notification.requestPermission(); } catch(e){} }
       }
-      else if (id === 'setVoiceDuration') {
-        saveSetting('voice_duration', parseInt(e.target.value));
-        alert('语音时长已保存。');
-      }
+      else if (id === 'setVoiceDuration') { saveSetting('voice_duration', parseInt(e.target.value)); alert('语音时长已保存。'); }
       else if (id === 'setSportTimeout') saveSetting('sport_timeout', e.target.value === '1');
-      else if (id === 'importDataFile') {
-        const f = e.target.files && e.target.files[0];
-        if (f) importBackup(f);
-        e.target.value = '';
-      }
+      else if (id === 'importDataFile') { const f = e.target.files && e.target.files[0]; if (f) importBackup(f); e.target.value = ''; }
     });
 
     d.addEventListener('click', function(e){
@@ -5576,7 +4780,6 @@ init();
       if (e.target.closest('#exportSportCsvBtn')) { e.preventDefault(); exportSportCsv(); return; }
       if (e.target.closest('#exportSkinCsvBtn')) { e.preventDefault(); exportSkinCsv(); return; }
       if (e.target.closest('#exportTxCsvBtn')) { e.preventDefault(); exportTxCsv(); return; }
-
       if (e.target.closest('#importDataBtn')) {
         e.preventDefault();
         if (window.AndroidBridge && typeof AndroidBridge.pickBackupFile === 'function') {
@@ -5586,25 +4789,9 @@ init();
         if (inp) inp.click();
         return;
       }
-
-      if (e.target.closest('#genWeekReportBtn')) {
-        e.preventDefault();
-        if (window.__generateReport) window.__generateReport('week');
-        document.getElementById('settingsMask')?.click();
-        return;
-      }
-      if (e.target.closest('#genMonthReportBtn')) {
-        e.preventDefault();
-        if (window.__generateReport) window.__generateReport('month');
-        document.getElementById('settingsMask')?.click();
-        return;
-      }
-      if (e.target.closest('#openReportHistoryBtn')) {
-        e.preventDefault();
-        document.getElementById('settingsMask')?.click();
-        setTimeout(() => document.getElementById('reportHistoryBtn')?.click(), 300);
-        return;
-      }
+      if (e.target.closest('#genWeekReportBtn')) { e.preventDefault(); if (window.__generateReport) window.__generateReport('week'); document.getElementById('settingsMask')?.click(); return; }
+      if (e.target.closest('#genMonthReportBtn')) { e.preventDefault(); if (window.__generateReport) window.__generateReport('month'); document.getElementById('settingsMask')?.click(); return; }
+      if (e.target.closest('#openReportHistoryBtn')) { e.preventDefault(); document.getElementById('settingsMask')?.click(); setTimeout(() => document.getElementById('reportHistoryBtn')?.click(), 300); return; }
     });
   }
 
@@ -5613,14 +4800,11 @@ init();
       const crash = window.__appStorageGet('last_crash');
       if (!crash) return;
       setTimeout(function(){
-        if (confirm('上次运行出现异常。是否查看详情？')) {
-          alert('异常信息：\n\n' + crash.slice(0, 800));
-        }
+        if (confirm('上次运行出现异常。是否查看详情？')) { alert('异常信息：\n\n' + crash.slice(0, 800)); }
         window.__appStorageRemove('last_crash');
       }, 2500);
     } catch(e){}
   }
-
   function checkBackupReminder(){
     try {
       const last = parseInt(window.__appStorageGet('lastBackupAt') || '0');
@@ -5630,14 +4814,10 @@ init();
       if (now - first < 3 * 86400000) return;
       if (last > 0 && now - last < 30 * 86400000) return;
       setTimeout(function(){
-        if (confirm('已超过 30 天未备份数据。\n\n是否现在导出 JSON 备份？')) {
-          const btn = document.getElementById('exportDataBtn');
-          if (btn) btn.click();
-        }
+        if (confirm('已超过 30 天未备份数据。\n\n是否现在导出 JSON 备份？')) { const btn = document.getElementById('exportDataBtn'); if (btn) btn.click(); }
       }, 3500);
     } catch(e){}
   }
-
   setInterval(function(){
     if (typeof getSportSession !== 'function') return;
     if (!getSetting('sport_timeout', true)) return;
@@ -5646,24 +4826,12 @@ init();
     if (Date.now() - s.startTs > 2 * 3600 * 1000 && !window.__sportWarned) {
       window.__sportWarned = true;
       sendNotification('训练已超时', '已经超过 2 小时，记得结束打卡');
-      if (confirm('训练已超过 2 小时，是否结束打卡？')) {
-        if (typeof endSportSession === 'function') endSportSession();
-      }
+      if (confirm('训练已超过 2 小时，是否结束打卡？')) { if (typeof endSportSession === 'function') endSportSession(); }
     }
   }, 5 * 60 * 1000);
-
-  setTimeout(function(){
-    injectAppSettings();
-    initSitReminder();
-    checkCrashLog();
-    checkBackupReminder();
-  }, 800);
-
-  document.addEventListener('click', function(e){
-    if (e.target.closest('[data-open-settings]')) setTimeout(injectAppSettings, 150);
-  }, true);
-
-  console.log('[Enhanced v4.8] 完整版已加载 · 首页时间线打卡模式');
+  setTimeout(function(){ injectAppSettings(); initSitReminder(); checkCrashLog(); checkBackupReminder(); }, 800);
+  document.addEventListener('click', function(e){ if (e.target.closest('[data-open-settings]')) setTimeout(injectAppSettings, 150); }, true);
+  console.log('[Enhanced v4.9] 完整版已加载 · 时间线打卡 + 8:00-17:00 久坐提醒 + 原生 CSV 导出 + SparkChain AI');
 })();
 </script>
 </body>
