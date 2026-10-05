@@ -29,6 +29,15 @@ import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
 
+import com.iflytek.sparkchain.core.LLM;
+import com.iflytek.sparkchain.core.LLMCallbacks;
+import com.iflytek.sparkchain.core.LLMConfig;
+import com.iflytek.sparkchain.core.LLMError;
+import com.iflytek.sparkchain.core.LLMEvent;
+import com.iflytek.sparkchain.core.LLMResult;
+import com.iflytek.sparkchain.core.SparkChain;
+import com.iflytek.sparkchain.core.SparkChainConfig;
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -49,10 +58,22 @@ public class MainActivity extends Activity {
     private static final int REQ_FILE_CHOOSER = 2001;
     private static final int REQ_PICK_BACKUP = 2002;
 
+    /* ★ 讯飞 SparkChain 凭据 */
+    private static final String XF_APPID = "4c627b59";
+    private static final String XF_API_KEY = "2fbffaacd145309be7c024db99e9c7ef";
+    private static final String XF_API_SECRET = "YzI1MDJmYWM0NTliNzNkMjI3NGIyM2Uz";
+
+    /* ★ 模型：4.0Ultra 需要账号已开通；若报错可改为 generalv3.5 / lite */
+    private static final String XF_DOMAIN = "4.0Ultra";
+    private static final String XF_URL = "wss://spark-api.xf-yun.com/v4.0/chat";
+
     private WebView webView;
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private ValueCallback<Uri[]> filePathCallback;
+
+    private LLM llm;
+    private boolean llmReady = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -138,6 +159,86 @@ public class MainActivity extends Activity {
         });
 
         requestPermsIfNeeded();
+
+        /* ★ 初始化 SparkChain */
+        initSparkChain();
+    }
+
+    /* ============================================================
+     *  ★ SparkChain 初始化（基于 2.1.4_rc4 反编译 API）
+     * ============================================================ */
+    private void initSparkChain() {
+        try {
+            SparkChainConfig config = SparkChainConfig.builder()
+                    .appID(XF_APPID)
+                    .apiKey(XF_API_KEY)
+                    .apiSecret(XF_API_SECRET);
+            int ret = SparkChain.getInst().init(getApplicationContext(), config);
+            Log.d(TAG, "SparkChain init ret=" + ret);
+            if (ret != 0) {
+                llmReady = false;
+                Log.e(TAG, "SparkChain init failed, ret=" + ret);
+                return;
+            }
+
+            LLMConfig llmConfig = LLMConfig.builder()
+                    .domain(XF_DOMAIN)
+                    .url(XF_URL);
+            llm = new LLM(llmConfig);
+
+            /* ★ 用 registerLLMCallbacks（不是 setLLMCallbacks） */
+            llm.registerLLMCallbacks(new LLMCallbacks() {
+                @Override
+                public void onLLMResult(LLMResult result, Object usrTag) {
+                    if (result == null) return;
+                    final String content = result.getContent() == null ? "" : result.getContent();
+                    final int status = result.getStatus();   // 0=首帧 1=中间 2=结束
+                    final String tag = (usrTag == null) ? "chat" : usrTag.toString();
+
+                    runOnUiThread(() -> {
+                        try {
+                            String q = JSONObject.quote(content);
+                            String tq = JSONObject.quote(tag);
+                            if (status == 2) {
+                                webView.evaluateJavascript(
+                                        "window.onNativeChatState && window.onNativeChatState('finished', " + tq + ")",
+                                        null);
+                            } else {
+                                webView.evaluateJavascript(
+                                        "window.onNativeChatResult && window.onNativeChatResult(" + q + ", " + tq + ")",
+                                        null);
+                            }
+                        } catch (Exception e) { Log.e(TAG, "onLLMResult eval fail", e); }
+                    });
+                }
+
+                @Override
+                public void onLLMEvent(LLMEvent event, Object usrTag) {
+                    // 无需处理
+                }
+
+                @Override
+                public void onLLMError(LLMError error, Object usrTag) {
+                    final String msg = (error == null || error.getErrMsg() == null) ? "未知错误" : error.getErrMsg();
+                    final String tag = (usrTag == null) ? "chat" : usrTag.toString();
+                    runOnUiThread(() -> {
+                        try {
+                            String m = JSONObject.quote(msg);
+                            String tq = JSONObject.quote(tag);
+                            webView.evaluateJavascript(
+                                    "window.onNativeChatError && window.onNativeChatError(" + m + ", " + tq + ")",
+                                    null);
+                        } catch (Exception e) { Log.e(TAG, "onLLMError eval fail", e); }
+                    });
+                }
+            });
+
+            llmReady = true;
+            Log.d(TAG, "SparkChain LLM ready");
+        } catch (Throwable t) {
+            Log.e(TAG, "initSparkChain fail", t);
+            llmReady = false;
+        }
     }
 
     private void requestPermsIfNeeded() {
@@ -327,17 +428,78 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setBackupReminder(boolean on) { }
 
-        /* ★ SparkChain 暂时未接入 —— 回给 JS 一个友好的错误提示 */
+        /* ============================================================
+         * ★ AI 聊天：用 arun（异步），usrTag = "chat"
+         * ============================================================ */
         @JavascriptInterface
         public void sendChat(final String text) {
-            webView.post(() -> webView.evaluateJavascript(
-                    "window.onNativeChatError && window.onNativeChatError('AI 聊天暂未接入，请稍后升级 App')", null));
+            if (!llmReady || llm == null) {
+                webView.post(() -> webView.evaluateJavascript(
+                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化')",
+                        null));
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    llm.clearHistory();
+                    int ret = llm.arun(text, "chat");
+                    if (ret != 0) {
+                        final String err = "arun 返回错误码 " + ret;
+                        webView.post(() -> {
+                            try {
+                                String m = JSONObject.quote(err);
+                                webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ")", null);
+                            } catch (Exception ignored) {}
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "sendChat fail", e);
+                    final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
+                    webView.post(() -> {
+                        try {
+                            String m = JSONObject.quote(msg);
+                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ")", null);
+                        } catch (Exception ignored) {}
+                    });
+                }
+            }).start();
         }
 
+        /* ============================================================
+         * ★ AI 搭配 / 报告：usrTag = "styling"
+         * ============================================================ */
         @JavascriptInterface
         public void sendStyling(final String prompt) {
-            webView.post(() -> webView.evaluateJavascript(
-                    "window.onNativeChatError && window.onNativeChatError('AI 搭配暂未接入，请稍后升级 App', 'styling')", null));
+            if (!llmReady || llm == null) {
+                webView.post(() -> webView.evaluateJavascript(
+                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化', 'styling')",
+                        null));
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    llm.clearHistory();
+                    int ret = llm.arun(prompt, "styling");
+                    if (ret != 0) {
+                        final String err = "arun 返回错误码 " + ret;
+                        webView.post(() -> {
+                            try {
+                                String m = JSONObject.quote(err);
+                                webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", 'styling')", null);
+                            } catch (Exception ignored) {}
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "sendStyling fail", e);
+                    final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
+                    webView.post(() -> {
+                        try {
+                            String m = JSONObject.quote(msg);
+                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", 'styling')", null);
+                        } catch (Exception ignored) {}
+                    });
+                }
+            }).start();
         }
     }
 
