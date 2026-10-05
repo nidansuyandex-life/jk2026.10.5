@@ -29,6 +29,15 @@ import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
 
+import com.iflytek.sparkchain.core.LLM;
+import com.iflytek.sparkchain.core.LLMCallbacks;
+import com.iflytek.sparkchain.core.LLMConfig;
+import com.iflytek.sparkchain.core.LLMError;
+import com.iflytek.sparkchain.core.LLMEvent;
+import com.iflytek.sparkchain.core.LLMOutput;
+import com.iflytek.sparkchain.core.SparkChain;
+import com.iflytek.sparkchain.core.SparkChainConfig;
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -54,6 +63,9 @@ public class MainActivity extends Activity {
     private boolean ttsReady = false;
     private ValueCallback<Uri[]> filePathCallback;
 
+    private LLM llm;
+    private boolean llmReady = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -76,10 +88,6 @@ public class MainActivity extends Activity {
             WebView.setWebContentsDebuggingEnabled(false);
         }
 
-        /* ========== 关键：用 https://appassets.androidplatform.net/ 加载页面 ==========
-           这样页面来源是 HTTPS，getUserMedia（麦克风）才能被允许。
-           原来用 file:///android_asset/ 会被 WebView 判定为不安全来源，麦克风直接失败。
-         */
         final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
@@ -98,52 +106,33 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
-
-            /* ========== 授权网页的麦克风 ========== */
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 runOnUiThread(() -> {
-                    try {
-                        request.grant(request.getResources());
-                        Log.d(TAG, "onPermissionRequest granted: " + java.util.Arrays.toString(request.getResources()));
-                    } catch (Exception e) {
-                        Log.e(TAG, "grant failed", e);
-                    }
+                    try { request.grant(request.getResources()); }
+                    catch (Exception e) { Log.e(TAG, "grant failed", e); }
                 });
             }
-
-            /* ========== 关键：文件选择器（衣橱上传照片） ========== */
             @Override
-            public boolean onShowFileChooser(WebView webView,
-                                             ValueCallback<Uri[]> callback,
-                                             FileChooserParams params) {
-                if (filePathCallback != null) {
-                    filePathCallback.onReceiveValue(null);
-                }
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                 filePathCallback = callback;
-
-                Intent intent = null;
-                try {
-                    intent = params.createIntent();
-                } catch (Exception ignored) {}
-
+                Intent intent;
+                try { intent = params.createIntent(); } catch (Exception e) { intent = null; }
                 if (intent == null) {
                     intent = new Intent(Intent.ACTION_GET_CONTENT);
                     intent.addCategory(Intent.CATEGORY_OPENABLE);
                     intent.setType("*/*");
                 }
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-                try {
-                    startActivityForResult(Intent.createChooser(intent, "选择文件"), REQ_FILE_CHOOSER);
-                } catch (Exception e) {
+                try { startActivityForResult(Intent.createChooser(intent, "选择文件"), REQ_FILE_CHOOSER); }
+                catch (Exception e) {
                     filePathCallback = null;
                     Toast.makeText(MainActivity.this, "无法打开文件选择器", Toast.LENGTH_SHORT).show();
                     return false;
                 }
                 return true;
             }
-
             @Override
             public boolean onConsoleMessage(ConsoleMessage cm) {
                 Log.d(TAG, "[Web] " + cm.message() + " @" + cm.lineNumber());
@@ -151,10 +140,8 @@ public class MainActivity extends Activity {
             }
         });
 
-        /* 通过 assetLoader 提供的 https 地址加载页面 */
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
 
-        // TTS
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 int r = tts.setLanguage(Locale.CHINA);
@@ -163,26 +150,75 @@ public class MainActivity extends Activity {
         });
 
         requestPermsIfNeeded();
+        initSparkChain();
+    }
+
+    private void initSparkChain() {
+        try {
+            SparkChainConfig config = SparkChainConfig.builder()
+                    .appId("4c627b59")
+                    .apiKey("2fbffaacd145309be7c024db99e9c7ef")
+                    .apiSecret("YzI1MDJmYWM0NTliNzNkMjI3NGIyM2Uz");
+            int ret = SparkChain.getInst().init(getApplicationContext(), config);
+            Log.d(TAG, "SparkChain init ret=" + ret);
+
+            LLMConfig llmConfig = LLMConfig.builder()
+                    .domain("4.0Ultra")
+                    .url("wss://spark-api.xf-yun.com/v4.0/chat");
+            llm = new LLM(llmConfig);
+            llmReady = true;
+
+            llm.setLLMCallbacks(new LLMCallbacks() {
+                @Override
+                public void onLLMResult(LLMOutput output, Object usrTag) {
+                    final String content = output.getContent();
+                    final int status = output.getStatus();
+                    final String tag = (usrTag == null) ? "chat" : usrTag.toString();
+                    runOnUiThread(() -> {
+                        try {
+                            String q = JSONObject.quote(content == null ? "" : content);
+                            String tq = JSONObject.quote(tag);
+                            if (status == 2) {
+                                webView.evaluateJavascript("window.onNativeChatState && window.onNativeChatState('finished', " + tq + ")", null);
+                            } else {
+                                webView.evaluateJavascript("window.onNativeChatResult && window.onNativeChatResult(" + q + ", " + tq + ")", null);
+                            }
+                        } catch (Exception e) { Log.e(TAG, "onLLMResult eval fail", e); }
+                    });
+                }
+                @Override
+                public void onLLMError(LLMError error, Object usrTag) {
+                    final String msg = (error == null) ? "未知错误" : error.getErrMsg();
+                    final String tag = (usrTag == null) ? "chat" : usrTag.toString();
+                    runOnUiThread(() -> {
+                        try {
+                            String m = JSONObject.quote(msg);
+                            String tq = JSONObject.quote(tag);
+                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", " + tq + ")", null);
+                        } catch (Exception e) { Log.e(TAG, "onLLMError eval fail", e); }
+                    });
+                }
+                @Override
+                public void onLLMEvent(LLMEvent event, Object usrTag) { }
+            });
+        } catch (Throwable t) {
+            Log.e(TAG, "initSparkChain fail", t);
+            llmReady = false;
+        }
     }
 
     private void requestPermsIfNeeded() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOC);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOC);
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
         if (requestCode == REQ_FILE_CHOOSER) {
             if (filePathCallback != null) {
                 Uri[] results = null;
@@ -190,9 +226,7 @@ public class MainActivity extends Activity {
                     if (data.getClipData() != null) {
                         int count = data.getClipData().getItemCount();
                         results = new Uri[count];
-                        for (int i = 0; i < count; i++) {
-                            results[i] = data.getClipData().getItemAt(i).getUri();
-                        }
+                        for (int i = 0; i < count; i++) results[i] = data.getClipData().getItemAt(i).getUri();
                     } else if (data.getData() != null) {
                         results = new Uri[]{data.getData()};
                     }
@@ -202,12 +236,10 @@ public class MainActivity extends Activity {
             }
             return;
         }
-
         if (requestCode == REQ_PICK_BACKUP) {
             if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
                 readBackupAndSend(data.getData());
             }
-            return;
         }
     }
 
@@ -222,21 +254,17 @@ public class MainActivity extends Activity {
                 br.close();
                 final String content = sb.toString();
                 final String quoted = JSONObject.quote(content);
-                runOnUiThread(() ->
-                        webView.evaluateJavascript(
-                                "window.onBackupFileContent && window.onBackupFileContent(" + quoted + ")", null));
+                runOnUiThread(() -> webView.evaluateJavascript("window.onBackupFileContent && window.onBackupFileContent(" + quoted + ")", null));
             } catch (Exception e) {
                 Log.e(TAG, "read backup failed", e);
                 runOnUiThread(() -> {
                     Toast.makeText(this, "读取备份失败", Toast.LENGTH_SHORT).show();
-                    webView.evaluateJavascript(
-                            "window.onBackupFileError && window.onBackupFileError('读取失败')", null);
+                    webView.evaluateJavascript("window.onBackupFileError && window.onBackupFileError('读取失败')", null);
                 });
             }
         }).start();
     }
 
-    /** 简单 KV 存储：所有 app_xxx 数据落到 files/kv/xxx.txt */
     private File kvFile(String key) {
         File dir = new File(getFilesDir(), "kv");
         if (!dir.exists()) dir.mkdirs();
@@ -246,7 +274,6 @@ public class MainActivity extends Activity {
 
     public class Bridge {
 
-        /* ---------- 持久化 ---------- */
         @JavascriptInterface
         public String load(String key) {
             try (FileInputStream in = new FileInputStream(kvFile(key))) {
@@ -269,56 +296,45 @@ public class MainActivity extends Activity {
             try { kvFile(key).delete(); } catch (Exception ignored) {}
         }
 
-        /* ---------- TTS ---------- */
         @JavascriptInterface
         public void speak(final String text) {
             runOnUiThread(() -> {
-                if (ttsReady && tts != null && text != null) {
+                if (ttsReady && tts != null && text != null)
                     tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "u" + System.currentTimeMillis());
-                }
             });
         }
 
-        /* ---------- 振动 ---------- */
         @JavascriptInterface
         public void vibrate() {
             runOnUiThread(() -> {
                 try {
                     Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                     if (v == null) return;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                         v.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE));
-                    } else {
-                        v.vibrate(300);
-                    }
+                    else v.vibrate(300);
                 } catch (Exception ignored) {}
             });
         }
 
-        /* ---------- 关键：导出备份 → 保存到外部目录 + 分享 ---------- */
         @JavascriptInterface
         public void saveBackup(final String json) {
             try {
                 File dir = new File(getExternalFilesDir(null), "backups");
                 if (!dir.exists()) dir.mkdirs();
-                String name = "健康生活备份_" +
-                        new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA).format(new Date()) + ".json";
+                String name = "健康生活备份_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA).format(new Date()) + ".json";
                 final File f = new File(dir, name);
-                try (FileOutputStream out = new FileOutputStream(f)) {
-                    out.write(json.getBytes("UTF-8"));
-                }
+                try (FileOutputStream out = new FileOutputStream(f)) { out.write(json.getBytes("UTF-8")); }
                 runOnUiThread(() -> {
                     try {
-                        Uri uri = FileProvider.getUriForFile(MainActivity.this,
-                                getPackageName() + ".fileprovider", f);
+                        Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
                         Intent share = new Intent(Intent.ACTION_SEND);
                         share.setType("application/json");
                         share.putExtra(Intent.EXTRA_STREAM, uri);
                         share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         startActivity(Intent.createChooser(share, "保存备份文件到…"));
                     } catch (Exception e) {
-                        Toast.makeText(MainActivity.this,
-                                "备份已保存: " + f.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                        Toast.makeText(MainActivity.this, "备份已保存: " + f.getAbsolutePath(), Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (Exception e) {
@@ -327,17 +343,40 @@ public class MainActivity extends Activity {
             }
         }
 
+        /* ★ CSV 导出：保存到外部目录 + 分享面板 */
+        @JavascriptInterface
+        public void saveCsv(final String csvContent, final String filename) {
+            try {
+                File dir = new File(getExternalFilesDir(null), "exports");
+                if (!dir.exists()) dir.mkdirs();
+                final File f = new File(dir, filename);
+                try (FileOutputStream out = new FileOutputStream(f)) { out.write(csvContent.getBytes("UTF-8")); }
+                runOnUiThread(() -> {
+                    try {
+                        Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
+                        Intent share = new Intent(Intent.ACTION_SEND);
+                        share.setType("text/csv");
+                        share.putExtra(Intent.EXTRA_STREAM, uri);
+                        share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(share, "保存 CSV 到…"));
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "已保存: " + f.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "saveCsv fail", e);
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "导出失败", Toast.LENGTH_SHORT).show());
+            }
+        }
+
         @JavascriptInterface
         public void saveDailyBackup(String json) {
             try {
                 File f = new File(getFilesDir(), "daily_backup.json");
-                try (FileOutputStream out = new FileOutputStream(f)) {
-                    out.write(json.getBytes("UTF-8"));
-                }
+                try (FileOutputStream out = new FileOutputStream(f)) { out.write(json.getBytes("UTF-8")); }
             } catch (Exception ignored) {}
         }
 
-        /* ---------- 关键：导入备份 → 原生文件选择器 ---------- */
         @JavascriptInterface
         public void pickBackupFile() {
             runOnUiThread(() -> {
@@ -345,44 +384,70 @@ public class MainActivity extends Activity {
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("*/*");
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                try {
-                    startActivityForResult(intent, REQ_PICK_BACKUP);
-                } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, "无法打开文件选择器", Toast.LENGTH_SHORT).show();
-                }
+                try { startActivityForResult(intent, REQ_PICK_BACKUP); }
+                catch (Exception e) { Toast.makeText(MainActivity.this, "无法打开文件选择器", Toast.LENGTH_SHORT).show(); }
             });
         }
 
-        /* ---------- 提醒开关（占位） ---------- */
         @JavascriptInterface
         public void setSitReminder(boolean on) { }
 
         @JavascriptInterface
         public void setBackupReminder(boolean on) { }
 
-        /* ---------- AI 聊天（暂未接入 SparkChain） ---------- */
         @JavascriptInterface
         public void sendChat(final String text) {
-            Log.d(TAG, "sendChat: " + text);
-            webView.post(() -> webView.evaluateJavascript(
-                    "window.onNativeChatError && window.onNativeChatError('AI 聊天需要接入讯飞 SparkChain，请参考官方文档在 MainActivity 中初始化')", null));
+            if (!llmReady || llm == null) {
+                webView.post(() -> webView.evaluateJavascript(
+                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化')", null));
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    llm.clearHistory();
+                    llm.chat(text, "chat");
+                } catch (Exception e) {
+                    Log.e(TAG, "sendChat fail", e);
+                    final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
+                    webView.post(() -> {
+                        try {
+                            String m = JSONObject.quote(msg);
+                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ")", null);
+                        } catch (Exception ignored) {}
+                    });
+                }
+            }).start();
         }
 
         @JavascriptInterface
         public void sendStyling(final String prompt) {
-            Log.d(TAG, "sendStyling");
-            webView.post(() -> webView.evaluateJavascript(
-                    "window.onNativeChatError && window.onNativeChatError('AI 搭配需要接入讯飞 SparkChain', 'styling')", null));
+            if (!llmReady || llm == null) {
+                webView.post(() -> webView.evaluateJavascript(
+                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化', 'styling')", null));
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    llm.clearHistory();
+                    llm.chat(prompt, "styling");
+                } catch (Exception e) {
+                    Log.e(TAG, "sendStyling fail", e);
+                    final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
+                    webView.post(() -> {
+                        try {
+                            String m = JSONObject.quote(msg);
+                            webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", 'styling')", null);
+                        } catch (Exception ignored) {}
+                    });
+                }
+            }).start();
         }
     }
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
-        }
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
     }
 
     @Override
