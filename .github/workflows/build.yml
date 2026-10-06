@@ -20,7 +20,7 @@ jobs:
         with:
           gradle-version: '8.4'
 
-      # ⭐ 关键：先生成一个 debug keystore，再构建
+      # 先生成一个 debug keystore，避免 "Keystore file not found"
       - name: Generate debug keystore
         run: |
           mkdir -p $HOME/.android
