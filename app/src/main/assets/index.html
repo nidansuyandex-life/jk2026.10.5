@@ -617,7 +617,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
             <p class="tip" style="margin-top:10px" id="exportRangeHint">当前：本月</p>
           </div>
           <button class="btn-primary" id="exportBtn">导出 CSV</button>
-          <div class="card" style="margin-top:12px"><div class="card-title">导出预览 <span class="muted" id="exportCount">0 条</span></div><div id="exportPreview" style="font-size:12px;color:#8A90A2;line-height:1.7"></div></div>
+          <button class="btn-ghost" id="importTxBtn" style="margin-top:8px">📥 导入 CSV（合并到账本）</button>
+          <input type="file" id="importTxFile" accept=".csv,text/csv" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <div class="card" style="margin-top:12px">
+            <div class="card-title">导出预览 <span class="muted" id="exportCount">0 条</span></div>
+            <div id="exportPreview" style="font-size:12px;color:#8A90A2;line-height:1.7"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -2108,6 +2113,101 @@ function exportCSV(){
   setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 3000);
 }
 
+/* ★ 记账导入：解析 CSV 并合并到现有记录（自动去重） */
+function importTransactionsCsv(file){
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      const raw = ev.target.result.replace(/^\ufeff/, '');
+      const lines = raw.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { alert('CSV 文件为空或格式不正确'); return; }
+
+      const parseCsvLine = (line) => {
+        const result = [];
+        let cur = '', inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQuote) {
+            if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
+            else if (ch === '"') inQuote = false;
+            else cur += ch;
+          } else {
+            if (ch === '"') inQuote = true;
+            else if (ch === ',') { result.push(cur); cur = ''; }
+            else cur += ch;
+          }
+        }
+        result.push(cur);
+        return result;
+      };
+
+      const header = parseCsvLine(lines[0]);
+      const idxDate   = header.findIndex(h => h.includes('日期'));
+      const idxTime   = header.findIndex(h => h.includes('时间'));
+      const idxAmount = header.findIndex(h => h.includes('金额'));
+      const idxType   = header.findIndex(h => h.includes('类型'));
+      const idxCat    = header.findIndex(h => h.includes('分类'));
+      const idxNote   = header.findIndex(h => h.includes('备注'));
+
+      if (idxDate < 0 || idxAmount < 0) {
+        alert('CSV 格式不正确：至少需要"日期"和"金额"两列');
+        return;
+      }
+
+      const existing = new Set(state.transactions.map(t =>
+        `${t.date}|${t.time}|${t.amount}|${t.type}|${t.category}|${t.note}`
+      ));
+
+      let added = 0, skipped = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const date = (cols[idxDate] || '').trim();
+        const amount = parseFloat((cols[idxAmount] || '').trim());
+        if (!date || isNaN(amount)) { skipped++; continue; }
+
+        const time = idxTime >= 0 && (cols[idxTime] || '').trim() ? (cols[idxTime] || '').trim() : fmtTime(new Date());
+        const typeStr = idxType >= 0 ? (cols[idxType] || '').trim() : '支出';
+        const type = (typeStr === '收入' || typeStr === 'income') ? 'income' : 'expense';
+        const category = idxCat >= 0 && (cols[idxCat] || '').trim() ? (cols[idxCat] || '').trim() : (type === 'income' ? '其他收入' : '其他');
+        const note = idxNote >= 0 ? (cols[idxNote] || '').trim() : '';
+
+        const sig = `${date}|${time}|${amount}|${type}|${category}|${note}`;
+        if (existing.has(sig)) { skipped++; continue; }
+
+        state.transactions.unshift({
+          id: Date.now() + Math.floor(Math.random()*1000) + i,
+          date, time, amount, category, note, type
+        });
+        existing.add(sig);
+        added++;
+      }
+
+      if (added > 0) {
+        saveTransactions();
+        renderMoney();
+        alert(`✓ 导入完成：新增 ${added} 条，跳过重复 ${skipped} 条。`);
+      } else {
+        alert(`没有新增记录（跳过重复 ${skipped} 条）。`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('导入失败：' + (err.message || '未知错误'));
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+/* ★ 绑定导入按钮 */
+document.getElementById('importTxBtn').addEventListener('click', () => {
+  document.getElementById('importTxFile').click();
+});
+document.getElementById('importTxFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  importTransactionsCsv(file);
+  e.target.value = '';
+});
+
 function renderCalendar(){
   const y = state.calYear, m = state.calMonth;
   $('#calMonthLabel').textContent = `${y} 年 ${m + 1} 月`;
@@ -3521,8 +3621,22 @@ function renderHomeTimeline(){
   if (!wrap) return;
   const t = todayStr();
   const checks = getChecks();
+
   const manualTodos = ((state.calendarData[t] || []).filter(x => x.manual)).slice();
   manualTodos.sort((a,b) => (a.time||'').localeCompare(b.time||''));
+
+  const mkManualTodoItem = (m) => {
+    const payload = encodeURIComponent(JSON.stringify({ date: t, time: m.time, title: m.title }));
+    return {
+      time: m.time || '',
+      text: m.title,
+      action:'todo',
+      isTodo:true,
+      manualPayload: payload,
+      done: !!m.done
+    };
+  };
+
   const ov = getOverride(new Date());
   const ovMap = { swim:'游泳', reduced:'减量训练', period:'经期休息', leave:'请假', rest:'休息' };
   let sportText = '运动';
@@ -3537,25 +3651,29 @@ function renderHomeTimeline(){
     { time:'07:40', text:'早饭（记得吃补剂）', sub:'鸡蛋 + 牛奶/豆浆 + 燕麦/面包 + 水果', action:'supplement', checkKey: `home_${t}_breakfast` },
     { time:'10:00', text:'学习', sub:'完成今日学习任务', checkKey: `home_${t}_study` }
   ];
-  if (manualTodos[0]) items.push({ time: manualTodos[0].time || '', text: manualTodos[0].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo1` });
+  if (manualTodos[0]) items.push(mkManualTodoItem(manualTodos[0]));
   items.push({ time:'11:30', text:'中饭（记得吃补剂）', sub:'米饭/面 + 肉/鱼/豆腐 + 两份蔬菜', action:'supplement', checkKey: `home_${t}_lunch` });
-  if (manualTodos[1]) items.push({ time: manualTodos[1].time || '', text: manualTodos[1].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo2` });
+  if (manualTodos[1]) items.push(mkManualTodoItem(manualTodos[1]));
   items.push({ time:'17:00', text:'晚饭（记得吃补剂）', sub:'米饭 + 鱼/鸡肉 + 蔬菜（避免油腻）', action:'supplement', checkKey: `home_${t}_dinner` });
-  if (manualTodos[2]) items.push({ time: manualTodos[2].time || '', text: manualTodos[2].title, action:'todo', isTodo:true, checkKey: `home_${t}_todo3` });
+  if (manualTodos[2]) items.push(mkManualTodoItem(manualTodos[2]));
   items.push({ time:'19:30', text: sportText, action:'sport', badge:'今日运动', checkKey: `home_${t}_sport` });
   if (isTrainingDay) items.push({ time:'21:00', text:'蛋白质（运动的时候就补）', sub:'若饿或蛋白不足，补充 20–30g 蛋白质', action:'sport', checkKey: `home_${t}_protein` });
   items.push({ time:'22:00', text:'洗漱（护肤）', sub:'晚间护理', action:'skin-night', badge:'晚间', checkKey: `home_${t}_skin_pm` });
   items.push({ time:'22:30', text:'睡前 90/90 呼吸', checkKey: `home_${t}_breathe` });
 
   wrap.innerHTML = items.map(it => {
-    const done = !!(it.checkKey && checks[it.checkKey]);
+    const done = it.manualPayload ? !!it.done : !!(it.checkKey && checks[it.checkKey]);
     const cls = ['home-tl-item'];
     if (done) cls.push('is-done');
     const actionAttr = it.action ? `data-home-action="${it.action}"` : '';
-    const badge = it.badge ? `<span class="home-tl-badge">${it.badge}</span>` : (it.isTodo ? `<span class="home-tl-badge todo">代办</span>` : '');
+    const badge = it.badge
+      ? `<span class="home-tl-badge">${it.badge}</span>`
+      : (it.isTodo ? `<span class="home-tl-badge todo">代办</span>` : '');
     const arrow = it.action ? `<span class="home-tl-arrow">›</span>` : '';
     const sub = it.sub ? `<span class="sub">${it.sub}</span>` : '';
-    const checkHtml = `<span class="check ${done ? 'done' : ''}" data-check-key="${it.checkKey}"></span>`;
+    const checkHtml = it.manualPayload
+      ? `<span class="check ${done ? 'done' : ''}" data-toggle-todo="${it.manualPayload}"></span>`
+      : `<span class="check ${done ? 'done' : ''}" data-check-key="${it.checkKey}"></span>`;
     return `<div class="${cls.join(' ')}" ${actionAttr}>
       ${checkHtml}
       <span class="home-tl-text">${it.time ? `<span class="tm">${it.time}</span>` : ''}${it.text}${sub}</span>
@@ -3641,7 +3759,6 @@ $$('.subnav').forEach(nav => {
     if (btn.textContent === '总代办') renderAllTodo();
     if (btn.textContent === '今日计划') renderSportSession();
     if (btn.textContent === '身体状态') { renderSportBodyStats(); renderHistorySummary(); renderActual(); }
-    /* ★ 新增：切到「正式训练」时重新渲染（根据打卡状态） */
     if (btn.textContent === '正式训练') renderFormal();
     if (btn.textContent === '护肤') renderSkin();
   });
@@ -4749,35 +4866,31 @@ init();
   }
   window.sendAppNotification = sendNotification;
 
-/* ★ 久坐提醒：仅在 8:00–11:30 和 13:00–17:00 两个时间段内触发 */
-function initSitReminder(){
-  try { window.__lastSitReminder = parseInt(window.__appStorageGet('last_sit_reminder') || '0'); } catch(e){ window.__lastSitReminder = 0; }
-  if (!window.__lastSitReminder) {
-    window.__lastSitReminder = Date.now();
-    window.__appStorageSet('last_sit_reminder', String(window.__lastSitReminder));
+  /* ★ 久坐提醒：仅在 8:00–11:30 和 13:00–17:00 两个时间段内触发 */
+  function initSitReminder(){
+    try { window.__lastSitReminder = parseInt(window.__appStorageGet('last_sit_reminder') || '0'); } catch(e){ window.__lastSitReminder = 0; }
+    if (!window.__lastSitReminder) {
+      window.__lastSitReminder = Date.now();
+      window.__appStorageSet('last_sit_reminder', String(window.__lastSitReminder));
+    }
+    setInterval(function(){
+      if (!getSetting('sit_reminder', true)) return;
+
+      const now = new Date();
+      const mins = now.getHours() * 60 + now.getMinutes();
+      const inMorning   = mins >= 8 * 60      && mins < 11 * 60 + 30;
+      const inAfternoon = mins >= 13 * 60     && mins < 17 * 60;
+      if (!inMorning && !inAfternoon) return;
+
+      const nowTs = Date.now();
+      if (nowTs - window.__lastSitReminder < 30 * 60 * 1000) return;
+      window.__lastSitReminder = nowTs;
+      window.__appStorageSet('last_sit_reminder', String(nowTs));
+
+      if (typeof showCenterTimer === 'function') showCenterTimer(200);
+      sendNotification('该站起来走动了', '起身 → 走动2–3分钟 → 下巴轻收5次 → 肩胛向后下轻收5–8次');
+    }, 60 * 1000);
   }
-  setInterval(function(){
-    if (!getSetting('sit_reminder', true)) return;
-
-    /* ---- 只在这两个时间段内触发 ----
-       ① 8:00 – 11:30
-       ② 13:00 – 17:00
-    */
-    const now = new Date();
-    const mins = now.getHours() * 60 + now.getMinutes();
-    const inMorning   = mins >= 8 * 60      && mins < 11 * 60 + 30;
-    const inAfternoon = mins >= 13 * 60     && mins < 17 * 60;
-    if (!inMorning && !inAfternoon) return;
-
-    const nowTs = Date.now();
-    if (nowTs - window.__lastSitReminder < 30 * 60 * 1000) return;
-    window.__lastSitReminder = nowTs;
-    window.__appStorageSet('last_sit_reminder', String(nowTs));
-
-    if (typeof showCenterTimer === 'function') showCenterTimer(200);
-    sendNotification('该站起来走动了', '起身 → 走动2–3分钟 → 下巴轻收5次 → 肩胛向后下轻收5–8次');
-  }, 60 * 1000);
-}
 
   const SEL_CSS = 'width:90px;border:1.5px solid #E3E6EF;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:14px;font-weight:600;text-align:right;color:#1B1F2A;background:#fff;outline:none';
 
@@ -4793,11 +4906,11 @@ function initSitReminder(){
     d.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid #EDEFF5';
     d.innerHTML =
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:14px 0 4px">应用设置</div>' +
-      '<div class="set-row"><span class="lb">久坐提醒（8:00–17:00，每30分钟）</span><select id="setSitReminder" style="' + SEL_CSS + '"><option value="1"' + (sit?' selected':'') + '>开</option><option value="0"' + (!sit?' selected':'') + '>关</option></select></div>' +
+      '<div class="set-row"><span class="lb">久坐提醒（8:00–11:30 / 13:00–17:00，每30分钟）</span><select id="setSitReminder" style="' + SEL_CSS + '"><option value="1"' + (sit?' selected':'') + '>开</option><option value="0"' + (!sit?' selected':'') + '>关</option></select></div>' +
       '<div class="set-row"><span class="lb">后台通知 / 备份提醒</span><select id="setNotification" style="' + SEL_CSS + '"><option value="1"' + (notif?' selected':'') + '>开</option><option value="0"' + (!notif?' selected':'') + '>关</option></select></div>' +
       '<div class="set-row"><span class="lb">语音时长</span><select id="setVoiceDuration" style="' + SEL_CSS + '"><option value="10"' + (vd==10?' selected':'') + '>10 秒</option><option value="15"' + (vd==15?' selected':'') + '>15 秒</option><option value="20"' + (vd==20?' selected':'') + '>20 秒</option></select></div>' +
       '<div class="set-row"><span class="lb">训练超时提醒</span><select id="setSportTimeout" style="' + SEL_CSS + '"><option value="1"' + (sport?' selected':'') + '>开</option><option value="0"' + (!sport?' selected':'') + '>关</option></select></div>' +
-      '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">久坐提醒：App 在前台时，仅 8:00–17:00 之间每 30 分钟弹一次。语音时长修改后立即生效。</p>' +
+      '<p style="font-size:11.5px;color:#8A90A2;margin-top:8px;line-height:1.6">久坐提醒：App 在前台时，仅 8:00–11:30 和 13:00–17:00 两个时段每 30 分钟弹一次。语音时长修改后立即生效。</p>' +
       '<div style="font-size:12px;font-weight:700;color:#8A90A2;letter-spacing:.5px;margin:20px 0 8px;padding-top:16px;border-top:1px solid #EDEFF5">数据备份</div>' +
       '<button id="exportDataBtn" style="width:100%;border:none;font-family:inherit;font-size:14px;font-weight:600;color:#fff;padding:13px;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,#8B7CF6,#B39BFF);margin-bottom:8px">⬇️ 导出数据备份（JSON）</button>' +
       '<button id="importDataBtn" style="display:block;width:100%;border:1.5px solid #E3E6EF;font-family:inherit;font-size:14px;font-weight:600;color:#5A6175;padding:12px;border-radius:12px;cursor:pointer;background:#fff;box-sizing:border-box">⬆️ 导入备份文件</button>' +
@@ -4884,7 +4997,7 @@ function initSitReminder(){
   }, 5 * 60 * 1000);
   setTimeout(function(){ injectAppSettings(); initSitReminder(); checkCrashLog(); checkBackupReminder(); }, 800);
   document.addEventListener('click', function(e){ if (e.target.closest('[data-open-settings]')) setTimeout(injectAppSettings, 150); }, true);
-  console.log('[Enhanced v5.0] 正式训练需先打卡 · 8:00-17:00 久坐提醒');
+  console.log('[Enhanced v5.1] 时间线联动 + CSV 导入 + 8:00-11:30/13:00-17:00 久坐提醒');
 })();
 </script>
 </body>
