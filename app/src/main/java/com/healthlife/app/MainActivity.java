@@ -2,8 +2,11 @@ package com.healthlife.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -57,13 +60,13 @@ public class MainActivity extends Activity {
     private static final int REQ_LOC = 1002;
     private static final int REQ_FILE_CHOOSER = 2001;
     private static final int REQ_PICK_BACKUP = 2002;
+    private static final int REQ_NOTIFICATION = 1003;
 
-    /* ★ 讯飞 SparkChain 凭据 */
+    /* 讯飞 SparkChain 凭据 */
     private static final String XF_APPID = "4c627b59";
     private static final String XF_API_KEY = "2fbffaacd145309be7c024db99e9c7ef";
     private static final String XF_API_SECRET = "YzI1MDJmYWM0NTliNzNkMjI3NGIyM2Uz";
-
-    /* ★ 模型：4.0Ultra 需要账号已开通；若报错可改为 generalv3.5 / lite */
+    /* 模型：4.0Ultra（需账号已开通）；若报错可改为 generalv3.5 / generalv3 / lite */
     private static final String XF_DOMAIN = "4.0Ultra";
     private static final String XF_URL = "wss://spark-api.xf-yun.com/v4.0/chat";
 
@@ -159,13 +162,63 @@ public class MainActivity extends Activity {
         });
 
         requestPermsIfNeeded();
-
-        /* ★ 初始化 SparkChain */
         initSparkChain();
+
+        /* ★ 启动久坐闹钟（读设置） */
+        try {
+            SharedPreferences sp = getSharedPreferences("health_life", Context.MODE_PRIVATE);
+            boolean on = sp.getBoolean("sit_reminder", true);
+            if (on) scheduleSitReminder();
+        } catch (Exception e) {
+            Log.e(TAG, "start sit reminder fail", e);
+        }
     }
 
     /* ============================================================
-     *  ★ SparkChain 初始化（基于 2.1.4_rc4 反编译 API）
+     *  久坐提醒 —— AlarmManager 每 30 分钟触发 SitReminderReceiver
+     *  使用 setInexactRepeating，不需要 SCHEDULE_EXACT_ALARM 权限
+     *  App 关闭后闹钟仍会触发；时间段过滤在 Receiver 里做
+     * ============================================================ */
+    private void scheduleSitReminder() {
+        try {
+            AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent intent = new Intent(this, SitReminderReceiver.class);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pi = PendingIntent.getBroadcast(this, 0, intent, flags);
+
+            long interval = 30 * 60 * 1000L;
+            long triggerAt = System.currentTimeMillis() + interval;
+
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP, triggerAt, interval, pi);
+            Log.d(TAG, "sit reminder scheduled");
+        } catch (Exception e) {
+            Log.e(TAG, "scheduleSitReminder fail", e);
+        }
+    }
+
+    private void cancelSitReminder() {
+        try {
+            AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent intent = new Intent(this, SitReminderReceiver.class);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pi = PendingIntent.getBroadcast(this, 0, intent, flags);
+            am.cancel(pi);
+            Log.d(TAG, "sit reminder cancelled");
+        } catch (Exception e) {
+            Log.e(TAG, "cancelSitReminder fail", e);
+        }
+    }
+
+    /* ============================================================
+     *  讯飞 SparkChain 初始化
      * ============================================================ */
     private void initSparkChain() {
         try {
@@ -175,48 +228,36 @@ public class MainActivity extends Activity {
                     .apiSecret(XF_API_SECRET);
             int ret = SparkChain.getInst().init(getApplicationContext(), config);
             Log.d(TAG, "SparkChain init ret=" + ret);
-            if (ret != 0) {
-                llmReady = false;
-                Log.e(TAG, "SparkChain init failed, ret=" + ret);
-                return;
-            }
+            if (ret != 0) { llmReady = false; return; }
 
             LLMConfig llmConfig = LLMConfig.builder()
                     .domain(XF_DOMAIN)
                     .url(XF_URL);
             llm = new LLM(llmConfig);
 
-            /* ★ 用 registerLLMCallbacks（不是 setLLMCallbacks） */
             llm.registerLLMCallbacks(new LLMCallbacks() {
                 @Override
                 public void onLLMResult(LLMResult result, Object usrTag) {
                     if (result == null) return;
                     final String content = result.getContent() == null ? "" : result.getContent();
-                    final int status = result.getStatus();   // 0=首帧 1=中间 2=结束
+                    final int status = result.getStatus();
                     final String tag = (usrTag == null) ? "chat" : usrTag.toString();
-
                     runOnUiThread(() -> {
                         try {
                             String q = JSONObject.quote(content);
                             String tq = JSONObject.quote(tag);
                             if (status == 2) {
                                 webView.evaluateJavascript(
-                                        "window.onNativeChatState && window.onNativeChatState('finished', " + tq + ")",
-                                        null);
+                                        "window.onNativeChatState && window.onNativeChatState('finished', " + tq + ")", null);
                             } else {
                                 webView.evaluateJavascript(
-                                        "window.onNativeChatResult && window.onNativeChatResult(" + q + ", " + tq + ")",
-                                        null);
+                                        "window.onNativeChatResult && window.onNativeChatResult(" + q + ", " + tq + ")", null);
                             }
                         } catch (Exception e) { Log.e(TAG, "onLLMResult eval fail", e); }
                     });
                 }
-
                 @Override
-                public void onLLMEvent(LLMEvent event, Object usrTag) {
-                    // 无需处理
-                }
-
+                public void onLLMEvent(LLMEvent event, Object usrTag) { }
                 @Override
                 public void onLLMError(LLMError error, Object usrTag) {
                     final String msg = (error == null || error.getErrMsg() == null) ? "未知错误" : error.getErrMsg();
@@ -226,15 +267,13 @@ public class MainActivity extends Activity {
                             String m = JSONObject.quote(msg);
                             String tq = JSONObject.quote(tag);
                             webView.evaluateJavascript(
-                                    "window.onNativeChatError && window.onNativeChatError(" + m + ", " + tq + ")",
-                                    null);
+                                    "window.onNativeChatError && window.onNativeChatError(" + m + ", " + tq + ")", null);
                         } catch (Exception e) { Log.e(TAG, "onLLMError eval fail", e); }
                     });
                 }
             });
 
             llmReady = true;
-            Log.d(TAG, "SparkChain LLM ready");
         } catch (Throwable t) {
             Log.e(TAG, "initSparkChain fail", t);
             llmReady = false;
@@ -247,6 +286,13 @@ public class MainActivity extends Activity {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOC);
+        }
+        /* Android 13+ 请求通知权限 */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS")
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{"android.permission.POST_NOTIFICATIONS"}, REQ_NOTIFICATION);
+            }
         }
     }
 
@@ -422,36 +468,33 @@ public class MainActivity extends Activity {
             });
         }
 
+        /* ★ 久坐提醒开关：真正调度/取消 AlarmManager */
         @JavascriptInterface
-        public void setSitReminder(boolean on) { }
+        public void setSitReminder(boolean on) {
+            try {
+                SharedPreferences sp = getSharedPreferences("health_life", Context.MODE_PRIVATE);
+                sp.edit().putBoolean("sit_reminder", on).apply();
+            } catch (Exception e) { Log.e(TAG, "save sit_reminder fail", e); }
+
+            if (on) scheduleSitReminder();
+            else cancelSitReminder();
+        }
 
         @JavascriptInterface
         public void setBackupReminder(boolean on) { }
 
-        /* ============================================================
-         * ★ AI 聊天：用 arun（异步），usrTag = "chat"
-         * ============================================================ */
+        /* ---------- AI 聊天 ---------- */
         @JavascriptInterface
         public void sendChat(final String text) {
             if (!llmReady || llm == null) {
                 webView.post(() -> webView.evaluateJavascript(
-                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化')",
-                        null));
+                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化')", null));
                 return;
             }
             new Thread(() -> {
                 try {
                     llm.clearHistory();
-                    int ret = llm.arun(text, "chat");
-                    if (ret != 0) {
-                        final String err = "arun 返回错误码 " + ret;
-                        webView.post(() -> {
-                            try {
-                                String m = JSONObject.quote(err);
-                                webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ")", null);
-                            } catch (Exception ignored) {}
-                        });
-                    }
+                    llm.arun(text, "chat");
                 } catch (Exception e) {
                     Log.e(TAG, "sendChat fail", e);
                     final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
@@ -465,30 +508,18 @@ public class MainActivity extends Activity {
             }).start();
         }
 
-        /* ============================================================
-         * ★ AI 搭配 / 报告：usrTag = "styling"
-         * ============================================================ */
+        /* ---------- AI 搭配 / 报告 ---------- */
         @JavascriptInterface
         public void sendStyling(final String prompt) {
             if (!llmReady || llm == null) {
                 webView.post(() -> webView.evaluateJavascript(
-                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化', 'styling')",
-                        null));
+                        "window.onNativeChatError && window.onNativeChatError('AI 未就绪，请检查网络或 SparkChain 初始化', 'styling')", null));
                 return;
             }
             new Thread(() -> {
                 try {
                     llm.clearHistory();
-                    int ret = llm.arun(prompt, "styling");
-                    if (ret != 0) {
-                        final String err = "arun 返回错误码 " + ret;
-                        webView.post(() -> {
-                            try {
-                                String m = JSONObject.quote(err);
-                                webView.evaluateJavascript("window.onNativeChatError && window.onNativeChatError(" + m + ", 'styling')", null);
-                            } catch (Exception ignored) {}
-                        });
-                    }
+                    llm.arun(prompt, "styling");
                 } catch (Exception e) {
                     Log.e(TAG, "sendStyling fail", e);
                     final String msg = (e.getMessage() == null) ? "发送失败" : e.getMessage();
