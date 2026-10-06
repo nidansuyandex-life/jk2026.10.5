@@ -4749,24 +4749,35 @@ init();
   }
   window.sendAppNotification = sendNotification;
 
-  function initSitReminder(){
-    try { window.__lastSitReminder = parseInt(window.__appStorageGet('last_sit_reminder') || '0'); } catch(e){ window.__lastSitReminder = 0; }
-    if (!window.__lastSitReminder) {
-      window.__lastSitReminder = Date.now();
-      window.__appStorageSet('last_sit_reminder', String(window.__lastSitReminder));
-    }
-    setInterval(function(){
-      if (!getSetting('sit_reminder', true)) return;
-      const h = new Date().getHours();
-      if (h < 8 || h >= 17) return;
-      const now = Date.now();
-      if (now - window.__lastSitReminder < 30 * 60 * 1000) return;
-      window.__lastSitReminder = now;
-      window.__appStorageSet('last_sit_reminder', String(now));
-      if (typeof showCenterTimer === 'function') showCenterTimer(200);
-      sendNotification('该站起来走动了', '起身 → 走动2–3分钟 → 下巴轻收5次 → 肩胛向后下轻收5–8次');
-    }, 60 * 1000);
+/* ★ 久坐提醒：仅在 8:00–11:30 和 13:00–17:00 两个时间段内触发 */
+function initSitReminder(){
+  try { window.__lastSitReminder = parseInt(window.__appStorageGet('last_sit_reminder') || '0'); } catch(e){ window.__lastSitReminder = 0; }
+  if (!window.__lastSitReminder) {
+    window.__lastSitReminder = Date.now();
+    window.__appStorageSet('last_sit_reminder', String(window.__lastSitReminder));
   }
+  setInterval(function(){
+    if (!getSetting('sit_reminder', true)) return;
+
+    /* ---- 只在这两个时间段内触发 ----
+       ① 8:00 – 11:30
+       ② 13:00 – 17:00
+    */
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const inMorning   = mins >= 8 * 60      && mins < 11 * 60 + 30;
+    const inAfternoon = mins >= 13 * 60     && mins < 17 * 60;
+    if (!inMorning && !inAfternoon) return;
+
+    const nowTs = Date.now();
+    if (nowTs - window.__lastSitReminder < 30 * 60 * 1000) return;
+    window.__lastSitReminder = nowTs;
+    window.__appStorageSet('last_sit_reminder', String(nowTs));
+
+    if (typeof showCenterTimer === 'function') showCenterTimer(200);
+    sendNotification('该站起来走动了', '起身 → 走动2–3分钟 → 下巴轻收5次 → 肩胛向后下轻收5–8次');
+  }, 60 * 1000);
+}
 
   const SEL_CSS = 'width:90px;border:1.5px solid #E3E6EF;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:14px;font-weight:600;text-align:right;color:#1B1F2A;background:#fff;outline:none';
 
